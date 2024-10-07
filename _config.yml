@@ -1,2 +1,5 @@
 source: docs
 theme: jekyll-theme-clean-blog
+
+baseurl: '/3dage_renderer'
+url: 'https://pipding.github.io/'
