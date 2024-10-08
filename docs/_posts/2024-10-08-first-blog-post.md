@@ -23,10 +23,14 @@ After consulting with my lecturer though, I've decided to try using [three.js](h
 In week 1 progress has involved gaining some basic familiarity with three.js. With it being a relatively new and web-native technology there's a fairly vibrant community with plenty of tutorials. threejs.org provides a set of ["Getting Started tutorials"](https://threejs.org/docs/index.html#manual/en/introduction/Installation) which I followed to get it up and running.
 Once it was running I needed to render something. I recently explored how to bake normal maps in Blender by modelling a basketball. three.js natively supports `.gltf` and `.glb` files so I re-exported my basketball from Blender, loaded it into my scene and...
 <br>
-![A screenshot of a three.js site showing a black screen with nothing on it](/assets/images/2024_10_01_black_screen.png)
+<p style="text-align: center;">
+  <img src="{{ "/assets/images/2024_10_01_black_screen.png" | relative_url }}" alt="A screenshot of a three.js site showing a black screen with nothing on it." style="max-width: 100%; height: auto;">
+</p>
 
 There's nothing there. I spent an embarrassing amount of time trying to figure out what was wrong before I tried adding a light to the scene.
 <br>
-![An animation of a rotating basketball rendered through three.js](/assets/images/2024_10_01_rendered_basketball.gif)
+<p style="text-align: center;">
+  <img src="{{ "/assets/images/2024_10_01_rendered_basketball.gif" | relative_url }}" alt="An animation of a rotating basketball rendered through three.js" style="max-width: 100%; height: auto;">
+</p>
 
 TA-DA!
