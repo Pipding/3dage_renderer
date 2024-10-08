@@ -26,12 +26,16 @@ if [ ! -d ".git" ]; then
     git remote add origin https://github.com/Pipding/3dage_renderer.git
 fi
 
-# Step 6: Add and commit changes
+# Step 6: Get the current timestamp and commit hash from the main repo
+timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+commit_hash=$(git rev-parse --short HEAD)  # Get the short commit hash from the current branch (main repo)
+
+# Step 7: Add and commit changes with dynamic commit message
 echo "Adding and committing changes..."
 git add .
-git commit -m "Deploy built site"
+git commit -m "Deploy built site at $timestamp (Commit: $commit_hash)"
 
-# Step 7: Push to gh-pages branch with force
+# Step 8: Push to gh-pages with force
 echo "Pushing to gh-pages branch..."
 git push --set-upstream origin gh-pages --force
 
