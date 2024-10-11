@@ -21,19 +21,19 @@ Since *startbootstrap-clean-blog-jekyll* is not an officially-supported theme, I
 Next, since Github would no longer be building the site for me automatically, I needed to build it on my own machine and push the built site to Github. This was a bit of an arduous process, partly because I was wrestling with both the *startbootstrap-clean-blog-jekyll* theme and Github pages at the same time. The theme expected a certain file structure, had a few bugs and outdated dependencies and was overall not the most user-friendly experience but I eventually got it working.
 <br>
 <p style="text-align: center;">
-  <img src="{{ "/assets/images/2024_10_08_blog_working.png" | relative_url }}" alt="A screenshot of the homepage of this blog." style="max-width: 100%; height: auto;">
+  <img src="{{ "/assets/images/2024_10_08_blog_working.PNG" | relative_url }}" alt="A screenshot of the homepage of this blog." style="max-width: 100%; height: auto;">
 </p>
 One nice thing about the theme I chose is it's responsive, so the layout dynamically adjusts to mobile screens too.
 <br>
 <p style="text-align: center;">
-  <img src="{{ "/assets/images/2024_10_08_blog_responsive.png" | relative_url }}" alt="A screenshot of the homepage of this blog on a phone, demonstrating its responsive design." style="max-width: 100%; height: auto;">
+  <img src="{{ "/assets/images/2024_10_08_blog_responsive.PNG" | relative_url }}" alt="A screenshot of the homepage of this blog on a phone, demonstrating its responsive design." style="max-width: 100%; height: auto;">
 </p>
 
 # Building and hosting the site
 To host the blog I created a new branch in my repo called `gh-pages`. This branch hosts _only_ the built blog, so it's totally separate from the `main` branch where I'll be working on my renderer. 
 <br>
 <p style="text-align: center;">
-  <img src="{{ "/assets/images/2024_10_08_blog_branches.png" | relative_url }}" alt="A screenshot of Github showing the contents of the gh-pages branch." style="max-width: 100%; height: auto;">
+  <img src="{{ "/assets/images/2024_10_08_blog_branches.PNG" | relative_url }}" alt="A screenshot of Github showing the contents of the gh-pages branch." style="max-width: 100%; height: auto;">
 </p>
 
 Updating the blog is a process unto itself where I need to run Jekyll locally to build the site, then navigate to the `_site` folder (the build output directory for Jekyll) to push changes to the `gh-pages` branch. It's a bit of a chore but fortunately I work as a build engineer for my day job, so automating build processes is my bread & butter. I created a [bash script](https://github.com/Pipding/3dage_renderer/blob/277a20a4f7c8d58624a0e711e3cecf15be0d2fb9/build_and_deploy_blog.sh) to automatically build & deploy the site et voila. This blog post is the first proper test of that whole process - previous tests included only small changes, like adding a favicon.
