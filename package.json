@@ -1,4 +1,11 @@
 {
+  "name": "3dage-renderer",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview"
+  },
   "dependencies": {
     "three": "^0.169.0"
   },
