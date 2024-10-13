@@ -1,5 +1,35 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+
+// Create .obj loader & load file
+const objLoader = new OBJLoader();
+let loadedObject = null;
+
+// Source: https://threejs.org/docs/#examples/en/loaders/OBJLoader
+objLoader.load('models/basketball_triangulated.obj',
+	// called when resource is loaded
+	function ( object ) {
+        loadedObject = object;
+
+        if (loadedObject instanceof THREE.Group) {
+            console.log("Loaded object is a Group");
+        } else if (loadedObject instanceof THREE.Mesh) {
+            console.log("Loaded object is a Mesh");
+        } else if (loadedObject instanceof THREE.Object3D) {
+            console.log("Loaded object is a generic Object3D");
+        }
+
+        renderWireframe(); // Start rendering once the object is loaded
+    },
+	// called when loading is in progress
+	function ( xhr ) {
+		console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+	},
+	// called when loading has errors
+	function ( error ) {
+		console.error('Error loading the OBJ file:', error);
+	}
+);
 
 // Create a canvas
 const canvas = document.createElement('canvas');
@@ -8,13 +38,29 @@ document.body.appendChild(canvas);
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
+
+// Set up a camera
+const camera = {
+    position: { x: 0, y: 0, z: -5 },
+    fov: 45
+};
+
 // Function to project 3D vertex into 2D space
 function projectVertex(vertex) {
-    const fov = 1000; // Field of view factor for perspective
-    const scale = fov / (fov + vertex.z); // Perspective scaling
+    let aspectRatio = canvas.width / canvas.height;
+    let screenHalfWidth = canvas.width / 2;
+    let screenHalfHeight = canvas.height / 2;
+    let tanHalfFOV =  Math.tan((camera.fov / 2.0) * (Math.PI / 180))
+
+    const translatedVertex = {
+        x: vertex.x - camera.position.x,
+        y: vertex.y - camera.position.y,
+        z: vertex.z - camera.position.z
+    };
+
     return {
-        x: vertex.x * scale + canvas.width / 2,
-        y: -vertex.y * scale + canvas.height / 2
+        x: (translatedVertex.x/(translatedVertex.z * tanHalfFOV)) * screenHalfWidth + screenHalfWidth,
+        y: (translatedVertex.y/(translatedVertex.z * tanHalfFOV)) * screenHalfHeight * aspectRatio + screenHalfHeight
     };
 }
 
@@ -27,77 +73,35 @@ function drawTriangle(ctx, v0, v1, v2) {
     ctx.stroke();
 }
 
-// Define three vertices of the triangle in 3D space
-const vertices = [
-    { x: -50, y: -50, z: 0 },  // Vertex 1
-    { x: 50, y: -50, z: 0 },   // Vertex 2
-    { x: 0, y: 50, z: 0 }      // Vertex 3
-];
+// Function to render the wireframe
+function renderWireframe() {
+    if (!loadedObject) return;
 
-function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Project the 3D vertices to 2D
-    const projectedVertices = vertices.map(projectVertex);
+    // Traverse the geometry of the loaded object
+    // The object is expected to load in as a THREE.Group (https://threejs.org/docs/#api/en/objects/Group)
+    // THREE.Group is a subclass of THREE.Object3D (https://threejs.org/docs/index.html#api/en/core/Object3D)
+    // so we can call .traverse() on it to iterate through its elements
+    loadedObject.traverse((child) => {
+        if (child.isMesh) {
+            const geometry = child.geometry;
+            // console.log(child) // Debug
+            const vertices = geometry.attributes.position.array;
 
-    // Draw the triangle using the projected vertices
-    drawTriangle(ctx, projectedVertices[0], projectedVertices[1], projectedVertices[2]);
+            // Loop through the vertices
+            for (let i = 0; i < vertices.length; i += 9) { // 9 because there are 3 vertices per triangle, each with 3 components (x, y, z)
+                const v0 = projectVertex(new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]));
+                const v1 = projectVertex(new THREE.Vector3(vertices[i + 3], vertices[i + 4], vertices[i + 5]));
+                const v2 = projectVertex(new THREE.Vector3(vertices[i + 6], vertices[i + 7], vertices[i + 8]));
+
+                drawTriangle(ctx, v0, v1, v2)
+            }
+        }
+    });
 
     // Continue the animation loop
-    requestAnimationFrame(render);
+    requestAnimationFrame(renderWireframe);
 }
 
-render();
-
-
-
-
-// Always seem to need 3 things; renderer, scene and camera
-
-// Renderer
-// const renderer = new THREE.WebGLRenderer();
-// renderer.setSize( window.innerWidth, window.innerHeight );
-// document.body.appendChild( renderer.domElement );
-
-// Camera
-// const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
-// camera.position.set( 0, 0, 100 );
-// camera.lookAt( 0, 0, 0 );
-
-// Scene
-// const scene = new THREE.Scene();
-
-// Create a material for lines
-// const material = new THREE.LineBasicMaterial( { color: 0x0000ff } );
-
-// const ambientLight = new THREE.AmbientLight( 0x404040 ); // soft white light
-// scene.add( ambientLight );
-
-// const light = new THREE.DirectionalLight( 0xffffff, 1 ); // white light
-// light.position.set( 10, 10, 10 ); // position the light
-// scene.add( light );
-
-
-// BASKETBALL
-// const loader = new GLTFLoader();
-
-// let basketball
-
-// loader.load( './models/basketball.glb', function ( gltf ) {
-//     gltf.scene.scale.set(10, 10, 10); 
-//     basketball = gltf.scene
-// 	scene.add( basketball );
-// }, undefined, function ( error ) {
-// 	console.error( error );
-// } );
-
-// function animate() {
-//     if (basketball) {
-//         basketball.rotation.x += 0.07;
-// 	    basketball.rotation.y += 0.07;
-//     }    
-
-// 	renderer.render( scene, camera );
-// }
-
-// renderer.setAnimationLoop( animate );
+renderWireframe();
