@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 
+// TODO: Make the ball rotate in the same way as the three.js version
+
 // Create .obj loader & load file
 const objLoader = new OBJLoader();
 let loadedObject = null;
@@ -31,6 +33,11 @@ objLoader.load('models/basketball_triangulated.obj',
 	}
 );
 
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+
 // Create a canvas
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d');
@@ -38,6 +45,9 @@ document.body.appendChild(canvas);
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
+ // Resize canvas initially and on window resize
+ window.addEventListener('resize', resizeCanvas);
+ resizeCanvas(); 
 
 // Set up a camera
 const camera = {
