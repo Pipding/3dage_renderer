@@ -1,52 +1,135 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 
-// Always seem to need 3 things; renderer, scene and camera
+// Create .obj loader & load file
+const objLoader = new OBJLoader();
+let loadedObject = null;
 
-// Renderer
-const renderer = new THREE.WebGLRenderer();
-renderer.setSize( window.innerWidth, window.innerHeight );
-document.body.appendChild( renderer.domElement );
+// Source: https://threejs.org/docs/#examples/en/loaders/OBJLoader
+objLoader.load('models/basketball_triangulated.obj',
+	// called when resource is loaded
+	function ( object ) {
+        loadedObject = object;
 
-// Camera
-const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
-camera.position.set( 0, 0, 100 );
-camera.lookAt( 0, 0, 0 );
+        if (loadedObject instanceof THREE.Group) {
+            console.log("Loaded object is a Group");
+        } else if (loadedObject instanceof THREE.Mesh) {
+            console.log("Loaded object is a Mesh");
+        } else if (loadedObject instanceof THREE.Object3D) {
+            console.log("Loaded object is a generic Object3D");
+        }
 
-// Scene
-const scene = new THREE.Scene();
+        renderWireframe(); // Start rendering once the object is loaded
+    },
+	// called when loading is in progress
+	function ( xhr ) {
+		console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+	},
+	// called when loading has errors
+	function ( error ) {
+		console.error('Error loading the OBJ file:', error);
+	}
+);
 
-// Create a material for lines
-const material = new THREE.LineBasicMaterial( { color: 0x0000ff } );
-
-const ambientLight = new THREE.AmbientLight( 0x404040 ); // soft white light
-scene.add( ambientLight );
-
-const light = new THREE.DirectionalLight( 0xffffff, 1 ); // white light
-light.position.set( 10, 10, 10 ); // position the light
-scene.add( light );
-
-
-// BASKETBALL
-const loader = new GLTFLoader();
-
-let basketball
-
-loader.load( './models/basketball.glb', function ( gltf ) {
-    gltf.scene.scale.set(10, 10, 10); 
-    basketball = gltf.scene
-	scene.add( basketball );
-}, undefined, function ( error ) {
-	console.error( error );
-} );
-
-function animate() {
-    if (basketball) {
-        basketball.rotation.x += 0.07;
-	    basketball.rotation.y += 0.07;
-    }    
-
-	renderer.render( scene, camera );
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 }
 
-renderer.setAnimationLoop( animate );
+// Create a canvas
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+document.body.appendChild(canvas);
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+ // Resize canvas initially and on window resize
+ window.addEventListener('resize', resizeCanvas);
+ resizeCanvas(); 
+
+// Set up a camera
+const camera = {
+    position: { x: 0, y: 0, z: -10 },
+    fov: 45
+};
+
+// Function to project 3D vertex into 2D space
+function projectVertex(vertex) {
+    let aspectRatio = canvas.width / canvas.height;
+    let screenHalfWidth = canvas.width / 2;
+    let screenHalfHeight = canvas.height / 2;
+    let tanHalfFOV =  Math.tan((camera.fov / 2.0) * (Math.PI / 180))
+
+    const translatedVertex = {
+        x: vertex.x - camera.position.x,
+        y: vertex.y - camera.position.y,
+        z: vertex.z - camera.position.z
+    };
+
+    return {
+        x: (translatedVertex.x/(translatedVertex.z * tanHalfFOV)) * screenHalfWidth + screenHalfWidth,
+        y: (translatedVertex.y/(translatedVertex.z * tanHalfFOV)) * screenHalfHeight * aspectRatio + screenHalfHeight
+    };
+}
+
+function drawTriangle(ctx, v0, v1, v2) {
+    ctx.strokeStyle = 'white';
+    ctx.beginPath();
+    ctx.moveTo(v0.x, v0.y);
+    ctx.lineTo(v1.x, v1.y);
+    ctx.lineTo(v2.x, v2.y);
+    ctx.closePath();
+    ctx.stroke();
+}
+
+// Function to render the wireframe
+function renderWireframe() {
+    if (!loadedObject) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    // Traverse the geometry of the loaded object
+    // The object is expected to load in as a THREE.Group (https://threejs.org/docs/#api/en/objects/Group)
+    // THREE.Group is a subclass of THREE.Object3D (https://threejs.org/docs/index.html#api/en/core/Object3D)
+    // so we can call .traverse() on it to iterate through its elements
+    loadedObject.traverse((child) => {
+        if (child.isMesh) {
+            const geometry = child.geometry;
+            // console.log(child) // Debug
+            child.rotation.x += 0.05;
+            child.rotation.y += 0.02;
+            const vertices = geometry.attributes.position.array;
+
+            // Before projecting the vertices into 2D space we need to apply rotation. To do this, use THREE.Object3D::applyMatrix4
+            // https://threejs.org/docs/#api/en/core/Object3D.applyMatrix4
+
+            var rotationMatrix = new THREE.Matrix4();
+
+            rotationMatrix.makeRotationFromEuler(child.rotation);
+
+            // Loop through the vertices
+            for (let i = 0; i < vertices.length; i += 9) { // 9 because there are 3 vertices per triangle, each with 3 components (x, y, z)
+                let v0 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
+                let v1 = new THREE.Vector3(vertices[i + 3], vertices[i + 4], vertices[i + 5]);
+                let v2 = new THREE.Vector3(vertices[i + 6], vertices[i + 7], vertices[i + 8]);
+
+                v0.applyMatrix4(rotationMatrix);
+                v1.applyMatrix4(rotationMatrix);
+                v2.applyMatrix4(rotationMatrix);
+
+                v0 = projectVertex(v0);
+                v1 = projectVertex(v1);
+                v2 = projectVertex(v2);
+
+                drawTriangle(ctx, v0, v1, v2)
+            }
+        }
+    });
+
+    // Continue the animation loop
+    requestAnimationFrame(renderWireframe);
+}
+
+renderWireframe();
