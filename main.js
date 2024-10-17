@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 
-// TODO: Make the ball rotate in the same way as the three.js version
-
 // Create .obj loader & load file
 const objLoader = new OBJLoader();
 let loadedObject = null;
