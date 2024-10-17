@@ -51,7 +51,7 @@ canvas.height = window.innerHeight;
 
 // Set up a camera
 const camera = {
-    position: { x: 0, y: 0, z: -5 },
+    position: { x: 0, y: 0, z: -10 },
     fov: 45
 };
 
@@ -75,6 +75,7 @@ function projectVertex(vertex) {
 }
 
 function drawTriangle(ctx, v0, v1, v2) {
+    ctx.strokeStyle = 'white';
     ctx.beginPath();
     ctx.moveTo(v0.x, v0.y);
     ctx.lineTo(v1.x, v1.y);
@@ -88,6 +89,8 @@ function renderWireframe() {
     if (!loadedObject) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     // Traverse the geometry of the loaded object
     // The object is expected to load in as a THREE.Group (https://threejs.org/docs/#api/en/objects/Group)
@@ -95,6 +98,7 @@ function renderWireframe() {
     // so we can call .traverse() on it to iterate through its elements
     loadedObject.traverse((child) => {
         if (child.isMesh) {
+            child.rotation.x += 0.1;
             const geometry = child.geometry;
             // console.log(child) // Debug
             const vertices = geometry.attributes.position.array;
