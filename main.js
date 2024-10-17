@@ -98,16 +98,32 @@ function renderWireframe() {
     // so we can call .traverse() on it to iterate through its elements
     loadedObject.traverse((child) => {
         if (child.isMesh) {
-            child.rotation.x += 0.1;
             const geometry = child.geometry;
             // console.log(child) // Debug
+            child.rotation.x += 0.05;
+            child.rotation.y += 0.02;
             const vertices = geometry.attributes.position.array;
+
+            // Before projecting the vertices into 2D space we need to apply rotation. To do this, use THREE.Object3D::applyMatrix4
+            // https://threejs.org/docs/#api/en/core/Object3D.applyMatrix4
+
+            var rotationMatrix = new THREE.Matrix4();
+
+            rotationMatrix.makeRotationFromEuler(child.rotation);
 
             // Loop through the vertices
             for (let i = 0; i < vertices.length; i += 9) { // 9 because there are 3 vertices per triangle, each with 3 components (x, y, z)
-                const v0 = projectVertex(new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]));
-                const v1 = projectVertex(new THREE.Vector3(vertices[i + 3], vertices[i + 4], vertices[i + 5]));
-                const v2 = projectVertex(new THREE.Vector3(vertices[i + 6], vertices[i + 7], vertices[i + 8]));
+                let v0 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
+                let v1 = new THREE.Vector3(vertices[i + 3], vertices[i + 4], vertices[i + 5]);
+                let v2 = new THREE.Vector3(vertices[i + 6], vertices[i + 7], vertices[i + 8]);
+
+                v0.applyMatrix4(rotationMatrix);
+                v1.applyMatrix4(rotationMatrix);
+                v2.applyMatrix4(rotationMatrix);
+
+                v0 = projectVertex(v0);
+                v1 = projectVertex(v1);
+                v2 = projectVertex(v2);
 
                 drawTriangle(ctx, v0, v1, v2)
             }
