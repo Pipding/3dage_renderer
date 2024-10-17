@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <link rel="icon" href="/3dage_renderer/assets/images/favicon.ico">
+
+  <title>
+    Bare wire(frame)s - Coordinates to Canvas
+    
+  </title>
+
+  <meta name="description" content="Two weeks ago I started working with Three.js and used it to render a spinning basketball. In case you need a refresher, here’s what that looked like.">
+
+  <link href='https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+  <link href='https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+  <script src="https://use.fontawesome.com/releases/v5.15.3/js/all.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="/3dage_renderer/assets/main.css">
+  <link rel="canonical" href="https://pipding.github.io//3dage_renderer/2024/10/15/rendering-wireframes.html">
+  <link rel="alternate" type="application/rss+xml" title="Coordinates to Canvas" href="/3dage_renderer/feed.xml">
+
+</head>
+
+
+<body>
+
+  <!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-light fixed-top" id="mainNav">
+  <div class="container">
+    <a class="navbar-brand" href="/3dage_renderer/">Coordinates to Canvas</a>
+    <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+      Menu
+      <i class="fa fa-bars"></i>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarResponsive">
+      <ul class="navbar-nav ml-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="/3dage_renderer/">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/3dage_renderer/about">About</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/3dage_renderer/posts">Posts</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/3dage_renderer/contact">Contact</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+
+  <!-- Page Header -->
+
+<header class="masthead" style="background-image: url('/3dage_renderer/assets/images/2024_10_15_wireframe_rotate.gif')">
+  
+    <div class="overlay"></div>
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto">
+          <div class="post-heading">
+            <h1>Bare wire(frame)s</h1>
+            
+            <h2 class="subheading">First stages of implementing the software rendering, week ending 2024-10-15</h2>
+            
+            <span class="meta">Posted by
+              <a href="#">Ryan</a>
+              on October 15, 2024 &middot; <span class="reading-time" title="Estimated read time">
+  
+   12 mins  read </span>
+
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto">
+
+        <p>Two weeks ago I started working with Three.js and used it to render a spinning basketball. In case you need a refresher, here’s what that looked like.
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024_10_01_rendered_basketball.gif" alt="An animation of a rotating basketball rendered through three.js" style="max-width: 100%; height: auto;" />
+</p>
+
+<p>Here’s what it looks like now, after two weeks of work:
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024_10_15_wireframe_rotate.gif" alt="An animated gif featuring a rotating wireframe of a sphere." style="max-width: 100%; height: auto;" />
+</p>
+
+<p>Ok, visually there’s been a significant downgrade. But that’s because I’m now using my own rendering code instead of using the inbuilt Three.js renderer. Let’s dive into everything it took to get from a black screen to this spinning wireframe!</p>
+
+<h1 id="getting-the-vertex-data">Getting the vertex data</h1>
+<p>The first thing we need is data. We can’t draw a mesh to the screen if we don’t know where all of its vertices are. Immediately we need to make a change from the Three.js implementation. If you’ve followed the <a href="https://threejs.org/docs/#manual/en/introduction/Loading-3D-models">Three.js “Getting Started” documentation</a> you may remember that Three.js works nicely with <code class="language-plaintext highlighter-rouge">glTF</code> and <code class="language-plaintext highlighter-rouge">glb</code> files. These file formats have their strengths, but neither is particularly useful to me because I can’t easily parse vertex data from them. As a result, I need to go back to Blender and re-export the model using a simpler file format, <code class="language-plaintext highlighter-rouge">obj</code>.</p>
+<blockquote>
+  <p><strong>Note:</strong> As I write this it occurs to me that I likely could’ve used the built-in model loading functions of Three.js to pull vertex data out of the <code class="language-plaintext highlighter-rouge">glb</code> file. I’ll have to try this at a later date.</p>
+</blockquote>
+
+<p>While I had Blender open there was one other change I made. for the beginning of this project, I’ve been following a tutorial by YouTube user <a href="https://www.youtube.com/@thebennybox">thebennybox</a> on how to create a software renderer. His tutorial is written in Java, but the fundamentals translate to any language or framework. In the 6th video of his series, <a href="https://youtu.be/V2vjePWZ1GI?si=g6-Ex7USrLzE4LCP&amp;t=572">#6 3D Software Rendering Tutorial: Solid Shapes</a>, thebennybox explains that the triangle (a.k.a. the 2D simplex) is the basis for 3D rendering. That is to say all 3D shapes are rendered as a collection of triangles. There are a number of reasons given for this;</p>
+<ul>
+  <li>Triangles have the fewest possible points of any solid shape</li>
+  <li>Triangles are completely flat in 3D space</li>
+  <li>Any arbitrary 2D shape can be defined using triangles</li>
+</ul>
+
+<p>Now, I’m vaguely aware of a process called triangulation. This is the process whereby each face of a 3D model or mesh is broken up into triangles, usually for the purposes of rendering. At some point I’ll need to implement triangulation but for now I’ll cheat a bit by triangulating the mesh ahead of time. In Blender, this is as simple as pressing <code class="language-plaintext highlighter-rouge">Ctrl + T</code> or using the pictured dropdown menu.
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024_10_15_triangulate_faces.png" alt="The Blender interface showing the dropdown menu with the Triangulate Faces option" style="max-width: 100%; height: auto;" />
+</p>
+
+<p><br /></p>
+
+<p>With the mesh triangulated and exported as an <code class="language-plaintext highlighter-rouge">obj</code> file, importing it into Three.js is as simple as importing the <code class="language-plaintext highlighter-rouge">OBJLoader</code> class like so:<br />
+<code class="language-plaintext highlighter-rouge">import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';</code></p>
+
+<p>From there, the Three.js documentation <a href="https://threejs.org/docs/#examples/en/loaders/OBJLoader">helpfully provides a sample usage</a> so it’s straightforward to get the model data loaded… but what next?</p>
+
+<h1 id="rendering-something">Rendering something</h1>
+<p>Now we have a triangulated mesh loaded into our application. What do we do with that? A lot, as it turns out. It’s difficult to know where to start with rendering so I’ll start with our end goal. Our end goal is to render a mesh to the screen. The mesh is made up of triangles, so what we really want to do is render a lot of triangles to the screen. Since drawing triangles is going to be fairly important, we can create a function to do that;
+<br /></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>function drawTriangle(ctx, v0, v1, v2) {
+    ctx.strokeStyle = 'white'; // Line colour
+    ctx.beginPath();
+    ctx.moveTo(v0.x, v0.y);
+    ctx.lineTo(v1.x, v1.y);
+    ctx.lineTo(v2.x, v2.y);
+    ctx.closePath();
+    ctx.stroke();
+}
+</code></pre></div></div>
+
+<p>Ok, so we can draw a triangle. How do we draw dozens or hundreds of them? Well, we simply iterate through all the vertices in the mesh, taking 3 at a time, and drawing triangles. It sounds simple and, for now, it is. When we simply iterate through all the vertices and draw them to the screen, we get a relatively convincing result.
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024_10_15_just_draw_triangles.png" alt="A simple wireframe rendering of a sphere." style="max-width: 100%; height: auto;" />
+</p>
+
+<p>We’re of course not done yet. See, when we render using the raw vertex data like this, we can only render the model from one angle and one perspective - the angle and perspective with which it was exported from Blender. There’s also something not quite right with the vertices at the rear of the object; they’re not aligned as they should be. This is because we’re not accounting for perspective, we’re basically doing an orthographic projection of the mesh. Let’s address that next.</p>
+
+<h2 id="adding-perspective">Adding perspective</h2>
+<p>I implemented a <code class="language-plaintext highlighter-rouge">projectVertex</code> function. This function takes a 3D point and projects it onto a 2D plane (the screen). This function is printed in full below, and is based on the example in video 5 the software rendering video series by thebennybox on YouTube titled <a href="https://www.youtube.com/watch?v=D3IhkRulkFE&amp;list=PLEETnX-uPtBUbVOok816vTl1K9vV1GgH5&amp;index=6">#5 3D Software Rendering Tutorial: The “Magic” of Perspective</a>. This video gives a very thorough explanation of why we use the tangent of half of the camera’s FOV to calculate perspective. In short, as things get closer to our eyes they appear to move closer to the centre of our vision and, conversely, as they move away they move towards the periphery of our vision. By using <code class="language-plaintext highlighter-rouge">tanHalfFOV</code> we approximate something like this shift in perspective.</p>
+
+<p>It’s also worth mentioning that this projection function had a number of iterations. The first iteration didn’t take into account <code class="language-plaintext highlighter-rouge">tanHalfFOV</code> and simply divided by the z-value of each vertex. This can produce a decent 3D effect in certain circumstances but didn’t work here. Early iterations also didn’t take aspect ration into account, meaning the rendered image would squash and stretch with the window.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>function projectVertex(vertex) {
+    let aspectRatio = canvas.width / canvas.height;
+    let screenHalfWidth = canvas.width / 2;
+    let screenHalfHeight = canvas.height / 2;
+    let tanHalfFOV =  Math.tan((camera.fov / 2.0) * (Math.PI / 180))
+
+    const translatedVertex = {
+        x: vertex.x - camera.position.x,
+        y: vertex.y - camera.position.y,
+        z: vertex.z - camera.position.z
+    };
+
+    return {
+        x: (translatedVertex.x/(translatedVertex.z * tanHalfFOV)) * screenHalfWidth + screenHalfWidth,
+        y: (translatedVertex.y/(translatedVertex.z * tanHalfFOV)) * screenHalfHeight * aspectRatio + screenHalfHeight
+    };
+}
+</code></pre></div></div>
+
+<p>What you may notice in this function is several references to a <code class="language-plaintext highlighter-rouge">camera</code> object. We use its <code class="language-plaintext highlighter-rouge">position</code> and <code class="language-plaintext highlighter-rouge">fov</code>. That is, in fact, all we need out of a camera. Here’s the entire thing:
+<br /></p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>const camera = {
+    position: { x: 0, y: 0, z: -10 },
+    fov: 45
+};
+</code></pre></div></div>
+
+<p>With just 4 numbers and some maths, we’re able to create a convincing 3D perspective effect. With a little extra work, we’d also be able to move the camera around and change the FOV.
+<br />
+With perspective added, here’s the rendered mesh.</p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024_10_15_triangles_with_perspective.png" alt="A simple wireframe rendering of a sphere with perspective applied." style="max-width: 100%; height: auto;" />
+</p>
+
+<p>Marginally better.</p>
+
+<h2 id="rotation">Rotation!</h2>
+<p>I wanted to make the gif for this blog post roughly similar to the one from week one, so I needed the mesh to spin. Thankfully, this wasn’t too complicated. When I load the model from the <code class="language-plaintext highlighter-rouge">obj</code> file, Three.js loads it as a <code class="language-plaintext highlighter-rouge">Group</code> object. <code class="language-plaintext highlighter-rouge">Group</code> is a subclass of <a href="https://threejs.org/docs/index.html#api/en/core/Object3D">Object3D</a> which means it has a field called <a href="https://threejs.org/docs/#api/en/core/Object3D.rotation">rotation</a> which contains, you guessed it, data about the rotation. Specifically it contains an Euler representation of a rotation. We don’t need to know what that means right now. What we need to know is that Euler rotations can be used to create a <a href="https://threejs.org/docs/#api/en/math/Matrix4">Matrix4</a> (a.k.a. a 4-dimensional matrix) and that a <code class="language-plaintext highlighter-rouge">Matrix4</code> can be used to rotate vertices in 3D space.
+I glossed over quite a bit there, and to some extent its because I don’t have a firm grasp on the mathematics involved. But suffice it to say that a <code class="language-plaintext highlighter-rouge">Matrix4</code> can be used to apply a transformation to a vertex. That transform can, as I understand, mean position, scale or rotation. We only care about rotation right now and fortunately, Three.js abides. Creating a <code class="language-plaintext highlighter-rouge">Matrix4</code> in Three.js, assuming we have an Euler representation of the rotation, is as simple as:
+<br /></p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>rotationMatrix.makeRotationFromEuler(eulerRotation);
+</code></pre></div></div>
+
+<p>So in order to make the wireframe spin, I simply adjust the rotation a little bit each frame and apply the new rotation, like so;
+<br /></p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mesh.rotation.x += 0.05;
+mesh.rotation.y += 0.02;
+
+var rotationMatrix = new THREE.Matrix4();
+rotationMatrix.makeRotationFromEuler(child.rotation);
+
+// Loop through the vertices
+for (let i = 0; i &lt; vertices.length; i += 9) { // 9 because there are 3 vertices per triangle, each with 3 components (x, y, z)
+    let v0 = ...
+    let v1 = ...
+    let v2 = ...
+
+    v0.applyMatrix4(rotationMatrix);
+    v1.applyMatrix4(rotationMatrix);
+    v2.applyMatrix4(rotationMatrix);
+
+    v0 = projectVertex(v0);
+    v1 = projectVertex(v1);
+    v2 = projectVertex(v2);
+
+    drawTriangle(ctx, v0, v1, v2)
+}
+</code></pre></div></div>
+
+<p>And the result is…
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024_10_15_wireframe_rotate.gif" alt="An animated gif featuring a rotating wireframe of a sphere." style="max-width: 100%; height: auto;" />
+</p>
+
+<h1 id="summary">Summary</h1>
+<p>We’ve come a long way from a black screen, but there’s still a long way to go. Before my software renderer is comparable to Three.js, I’ll need to implement rasterization so I can add texture maps and lighting. I’ll also need to implement triangulation if I want to be able to handle meshes with non-triangular geometry. But for one week I’m fairly happy with this progress.</p>
+
+
+        <hr>
+
+        <div class="clearfix">
+
+          
+          <a class="btn btn-primary float-left" href="/3dage_renderer/2024/10/08/meta-blog-post.html" data-toggle="tooltip" data-placement="top" title="A very meta blog post">&larr; Previous<span class="d-none d-md-inline">
+              Post</span></a>
+          
+          
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Footer -->
+
+<hr>
+
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto">
+        <ul class="list-inline text-center">
+          
+          
+          
+          
+          
+          
+        </ul>
+        <p class="copyright text-muted">Copyright &copy;  2024</p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/3dage_renderer/assets/vendor/startbootstrap-clean-blog/js/scripts.js"></script>
+
+<script src="/3dage_renderer/assets/scripts.js"></script>
+
+
+
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id="></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', '');
+</script>
+
+
+
+</body>
+
+</html>
