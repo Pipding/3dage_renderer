@@ -1,35 +1,76 @@
 import * as THREE from 'three';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-// Create .obj loader & load file
+const FileType = {
+    OBJ: 'obj',
+    GLTF: 'gltf'
+};
+
 const objLoader = new OBJLoader();
+const gltfLoader = new GLTFLoader();
+
 let loadedObject = null;
+let loadedFileType = null;
 
-// Source: https://threejs.org/docs/#examples/en/loaders/OBJLoader
-objLoader.load('models/basketball_triangulated.obj',
-	// called when resource is loaded
-	function ( object ) {
-        loadedObject = object;
+function loadObj(filePath, callback) {
+    // Source: https://threejs.org/docs/#examples/en/loaders/OBJLoader
+    objLoader.load(filePath,
+        // called when resource is loaded
+        function ( object ) {
+            loadedObject = object;
 
-        if (loadedObject instanceof THREE.Group) {
-            console.log("Loaded object is a Group");
-        } else if (loadedObject instanceof THREE.Mesh) {
-            console.log("Loaded object is a Mesh");
-        } else if (loadedObject instanceof THREE.Object3D) {
-            console.log("Loaded object is a generic Object3D");
+            if (loadedObject instanceof THREE.Group) {
+                console.log("Loaded object is a Group");
+            } else if (loadedObject instanceof THREE.Mesh) {
+                console.log("Loaded object is a Mesh");
+            } else if (loadedObject instanceof THREE.Object3D) {
+                console.log("Loaded object is a generic Object3D");
+            }
+
+            loadedFileType = FileType.OBJ;
+
+            callback()
+        },
+        // called when loading is in progress
+        function ( xhr ) {
+            console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+        },
+        // called when loading has errors
+        function ( error ) {
+            console.error('Error loading the OBJ file:', error);
         }
+    );
+}
 
-        renderWireframe(); // Start rendering once the object is loaded
-    },
-	// called when loading is in progress
-	function ( xhr ) {
-		console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
-	},
-	// called when loading has errors
-	function ( error ) {
-		console.error('Error loading the OBJ file:', error);
-	}
-);
+function loadGLTF(filePath, callback) {
+    gltfLoader.load(filePath,
+        // called when resource is loaded
+        function ( object ) {
+            loadedObject = object.scene; // TODO: Not sure if GLTF/GLB always has a scene
+
+            if (loadedObject instanceof THREE.Group) {
+                console.log("Loaded object is a Group");
+            } else if (loadedObject instanceof THREE.Mesh) {
+                console.log("Loaded object is a Mesh");
+            } else if (loadedObject instanceof THREE.Object3D) {
+                console.log("Loaded object is a generic Object3D");
+            }
+
+            loadedFileType = FileType.GLTF;
+
+            callback()
+        },
+        // called when loading is in progress
+        function ( xhr ) {
+            console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+        },
+        // called when loading has errors
+        function ( error ) {
+            console.error('Error loading the GLTF file:', error);
+        }
+    );
+}
 
 function resizeCanvas() {
     canvas.width = window.innerWidth;
@@ -132,4 +173,6 @@ function renderWireframe() {
     requestAnimationFrame(renderWireframe);
 }
 
-renderWireframe();
+// loadObj("models/basketball_triangulated.obj", renderWireframe)
+
+loadGLTF("models/basketball.glb", renderWireframe)
