@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <link rel="icon" href="/3dage_renderer/assets/images/favicon.ico">
+
+  <title>
+    Putting meat on the bones - Coordinates to Canvas
+    
+  </title>
+
+  <meta name="description" content="Before I go into a diatribe about the trials and tribulations of implementing rasterization, I’ll just mention that this week started on a totally different ...">
+
+  <link href='https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+  <link href='https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+  <script src="https://use.fontawesome.com/releases/v5.15.3/js/all.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="/3dage_renderer/assets/main.css">
+  <link rel="canonical" href="https://pipding.github.io//3dage_renderer/2024/10/22/start-rasterizing.html">
+  <link rel="alternate" type="application/rss+xml" title="Coordinates to Canvas" href="/3dage_renderer/feed.xml">
+
+</head>
+
+
+<body>
+
+  <!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-light fixed-top" id="mainNav">
+  <div class="container">
+    <a class="navbar-brand" href="/3dage_renderer/">Coordinates to Canvas</a>
+    <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+      Menu
+      <i class="fa fa-bars"></i>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarResponsive">
+      <ul class="navbar-nav ml-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="/3dage_renderer/">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/3dage_renderer/about">About</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/3dage_renderer/posts">Posts</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/3dage_renderer/contact">Contact</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+
+  <!-- Page Header -->
+
+<header class="masthead" style="background-image: url('/3dage_renderer/assets/images/2024_10_22_bad_texture.gif')">
+  
+    <div class="overlay"></div>
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto">
+          <div class="post-heading">
+            <h1>Putting meat on the bones</h1>
+            
+            <h2 class="subheading">Starting to implement rasterization to draw textures, week ending 2024-10-22</h2>
+            
+            <span class="meta">Posted by
+              <a href="#">Ryan</a>
+              on October 22, 2024 &middot; <span class="reading-time" title="Estimated read time">
+  
+   14 mins  read </span>
+
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto">
+
+        <p>Before I go into a diatribe about the trials and tribulations of implementing rasterization, I’ll just mention that this week started on a totally different note. I expected to be shifting the code away from <code class="language-plaintext highlighter-rouge">.obj</code> files to <code class="language-plaintext highlighter-rouge">.glb</code> or <code class="language-plaintext highlighter-rouge">.gltf</code> because I needed texture data. What I quickly realised though is that I didn’t need to use a specific file format to get texture data &amp; so I’ve stuck with <code class="language-plaintext highlighter-rouge">.obj</code>.
+With that out of the way, on to rasterization.</p>
+
+<h1 id="what-is-rasterization">What is rasterization?</h1>
+<p>Rasterization is the process of turning data into pixels. Now, in some sense one could argue that I had already implemented this last week with the wireframe view. Technically that might be true, but the wireframe view uses the Canvas <a href="https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/lineTo">lineTo</a> function, which basically handles the rasterization for me so I’m not counting that. What I need to be able to do is take vertex data from the model, combine that with colour data from the texture and draw the resulting pixels to screen. The process goes something like this;</p>
+
+<ol>
+  <li>Project the 3D vertex data into 2D screen space (this carries over from the wireframe view)</li>
+  <li>Read the texture data for the 3D vertices and find the corresponding point on the texture map</li>
+  <li>Draw a triangle, interpolating between the points on the texture map we found in step 2 to determine pixel colour</li>
+</ol>
+
+<h1 id="projecting-3d-vertex-data-into-2d-screen-space">Projecting 3D vertex data into 2D screen space</h1>
+<p>This is basically the process of turning 3D vertex data into a 2D shape so it can be drawn on a screen. The code used carries over from the wireframe view I implemented last week. The following illustration posted on <a href="https://math.stackexchange.com/">math.stackexchange.com</a> by user <a href="https://math.stackexchange.com/a/2306853">Nominal Animal</a> shows how a cube might be projected onto a 2D plane.
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024_10_22_vertex_projection.png" alt="A diagram demonstrating the projection of a 3D shape onto a 2D plane." style="max-width: 100%; height: auto;" />
+</p>
+
+<p>What we’re doing is slightly different because instead of projecting a 3D shape (like a cube) in 3D space onto a 2D plane, we’re projecting 2D shapes (triangles) in 3D space onto a 2D plane. From a maths/coding perspective there’s no difference, except that we will eventually have to deal with triangles which are facing away from the camera, and therefore are not visible. But that’s for another time.</p>
+
+<p>I won’t go into how this works again but I will briefly recommend again the YouTube video I used to learn about this - <a href="https://www.youtube.com/watch?v=D3IhkRulkFE&amp;list=PLEETnX-uPtBUbVOok816vTl1K9vV1GgH5&amp;index=6">#5 3D Software Rendering Tutorial: The “Magic” of Perspective by YouTube user ‘thebennybox’</a>.</p>
+
+<h1 id="step-2-reading-texture-data">Step 2 Reading texture data</h1>
+<p>This is where the new stuff is introduced. At the highest level, the difference is that in the render function we change <br />
+<code class="language-plaintext highlighter-rouge">drawTriangle(ctx, v0, v1, v2);</code> <br />
+to <br />
+<code class="language-plaintext highlighter-rouge">rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2, loadedDiffuseMap);</code> <br /></p>
+
+<p>The difference between these functions is a lot bigger than the signatures let on. <code class="language-plaintext highlighter-rouge">drawTriangle</code> can simply draw a line (using the aforementioned <a href="https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/lineTo">lineTo</a> function) between each of the given vertices. <code class="language-plaintext highlighter-rouge">rasterizeTriangle</code> has to do a lot more.
+Instead of just drawing a line between the vertices, <code class="language-plaintext highlighter-rouge">rasterizeTriangle</code> draws triangles pixel-by-pixel. To do this, it must manually check every pixel in the image to see whether or not the coordinates of each pixel fall within the triangle. Checking all of the pixels on the screen, as you can imagine, would be horribly slow, so we don’t actually do that. Instead, we create a box which fully encompasses the triangle and just check the pixels inside that box.
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024_10_22_triangle_bounding_box.png" alt="An image of a triangle inside a square, representing the bounding box of the triangle." style="max-width: 100%; height: auto;" />
+</p>
+
+<p>The code to determine the bounding box of a triangle given its vertices is pretty straightforward.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>const minX = Math.min(v0.x, v1.x, v2.x);
+const maxX = Math.max(v0.x, v1.x, v2.x);
+const minY = Math.min(v0.y, v1.y, v2.y);
+const maxY = Math.max(v0.y, v1.y, v2.y);
+</code></pre></div></div>
+
+<p>We then look through every pixel inside that bounding box and calculate the barycentric coordinates of the pixels, in relation to the triangle.</p>
+<h3 id="what-are-barycentric-coordinates">What are barycentric coordinates?</h3>
+<p>Barycentric coordinates are coordinates which are relative to the vertices of the triangle. If that doesn’t make sense, don’t worry. First let’s look at a coordinate system most people are familiar with - a rectangle, specifically, a screen. We’re used to considering the top-left corner of a screen to be (0, 0). The following image from <a href="https://www3.ntu.edu.sg/home/ehchua/programming/opengl/images/Graphics3D_DisplayCoord.png">ntu.edu.sg</a> demonstrates this.
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024_10_22_screen_space_coordinates.png" alt="A diagram of a screen showing the coordinate 0, 0 at the top left corner." style="max-width: 100%; height: auto;" />
+</p>
+
+<p>Normally the bottom-left corner of the screen is determined by its width and height but if we normalised the coordinates, we could call the top-left corner is (0, 0) and the bottom-right corner (1, 1).
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024_10_22_normalized_screen_space_coords.png" alt="A diagram of a screen showing the coordinate 0, 0 at the top left corner and 1, 1 at the bottom right." style="max-width: 100%; height: auto;" />
+</p>
+
+<p>We could then define any point within this rectangle relative to the bounds of the rectangle. This is a barycentric coordinate.
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024_10_22_barycentric_screen_coordinate.png" alt="A diagram of a screen showing the coordinate 0, 0 at the top left corner, 1, 1 at the bottom right and a barycentric coordinate at 0.9, 0.9." style="max-width: 100%; height: auto;" />
+</p>
+
+<p>This principle can be used in triangles too, to determine coordinates relative to its three points. The following diagram from section 22.8 of Akenine-Moller’s Real-Time Rendering Fourth Edition gives an example of how this may look.
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024_10_22_barycentric_coordinates_triangle.png" alt="A diagram showing barycentric coordinates of a triangle." style="max-width: 100%; height: auto;" />
+</p>
+
+<p>Barycentric coordinates are useful to us because they;</p>
+<ul>
+  <li>Tell us whether or not a point is inside a triangle</li>
+  <li>Tell us the position of the given pixel relative to the vertices of the triangle, which we’ll use to read data from the texture map later</li>
+</ul>
+
+<h3 id="using-barycentric-coordinates-to-read-texture-data">Using barycentric coordinates to read texture data</h3>
+<p>The important take-away for barycentric coordinates is that they have 3 elements (<code class="language-plaintext highlighter-rouge">u</code>, <code class="language-plaintext highlighter-rouge">v</code>, <code class="language-plaintext highlighter-rouge">w</code>) and we can use these 3 elements to figure out which pixel(s) of a UV map we should read to determine the colour of a given pixel. So, let’s remind ourselves of how UV maps work.</p>
+
+<p>The picture below shows the now-iconic basketball mesh I’ve been using, alongside its diffuse (texture) map. When we create a UV map, we are essentially creating a link between each of the vertices in the mesh and a pixel in the texture map. This data is going to be baked into the files we export from Blender.
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024_10_22_basketball_uv_map.png" alt="A screenshot of Blender showing a 3D model of a basketball alongside its UV map." style="max-width: 100%; height: auto;" />
+</p>
+
+<p>So, for example, the selected triangle in the screenshot below is mapped to the highlighted section of the diffuse map. This can be used to determine which colour the pixels at each vertex should be, but not necessarily what colour the rest of the triangle should be. To figure that out, we need to interpolate.
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024_10_22_basketball_triangle_to_diffuse.png" alt="A screenshot of Blender showing a 3D model of a basketball alongside its UV map." style="max-width: 100%; height: auto;" />
+</p>
+
+<h1 id="interpolating-pixel-colours-from-a-uv-map">Interpolating pixel colours from a UV map</h1>
+<p>This is where we tie together everything we’ve learned so far to generate a fully-rendered 3D image. We’re going to create a render loop which will loop through every triangle in the mesh and for each one, it will calculate the following;</p>
+<ul>
+  <li>A bounding box around the triangle, limiting the number of pixels we need to check</li>
+  <li>Barycentric coordinates for each pixel in the bounding box (any pixels which are not inside the triangle will be ignored)</li>
+  <li>UV coordinates for each vertex of the triangle
+    <ul>
+      <li>I didn’t go into too much detail on this, because the UV coordinates are determined in Blender and baked into the 3D model, so we can read the data using Three.js without much effort</li>
+    </ul>
+  </li>
+</ul>
+
+<p>Here’s how we do it. First, iterate through all of the pixels in the bounding box.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// Loop through all pixels in the bounding box
+for (let y = minY; y &lt;= maxY; y++) {
+    for (let x = minX; x &lt;= maxX; x++) {
+        // TBD...
+    }
+}
+</code></pre></div></div>
+
+<p>Within that loop, calculate the barycentric coordinates of each pixel and, if the pixel isn’t in the triangle, skip it.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// Loop through all pixels in the bounding box
+for (let y = minY; y &lt;= maxY; y++) {
+    for (let x = minX; x &lt;= maxX; x++) {
+        const { u, v, w } = computeBarycentric(x, y, v0, v1, v2);
+
+        // Check if the pixel is inside the triangle
+        if (u &gt;= 0 &amp;&amp; v &gt;= 0 &amp;&amp; w &gt;= 0) {
+            // TBD...
+        }
+    }
+}
+</code></pre></div></div>
+
+<p>Use the barycentric coordinates to interpolate between the vertices of the UV coordinates and figure out which pixel to sample from the diffuse map.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// Loop through all pixels in the bounding box
+for (let y = minY; y &lt;= maxY; y++) {
+    for (let x = minX; x &lt;= maxX; x++) {
+        const { u, v, w } = computeBarycentric(x, y, v0, v1, v2);
+
+        // Check if the pixel is inside the triangle
+        if (u &gt;= 0 &amp;&amp; v &gt;= 0 &amp;&amp; w &gt;= 0) {
+            // Interpolate the UV coordinates using the barycentric weights
+            const interpolatedUV = new THREE.Vector2(
+                u * uv0.x + v * uv1.x + w * uv2.x, // TODO: This is inverted...?
+                1 - (u * uv0.y + v * uv1.y + w * uv2.y) // No, this is inverted...
+            );
+
+            // TBD...
+        }
+    }
+}
+</code></pre></div></div>
+
+<p>And finally, we read the colour data of the pixel from the diffuse map and draw it to the appropriate pixel on the screen.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// Loop through all pixels in the bounding box
+for (let y = minY; y &lt;= maxY; y++) {
+    for (let x = minX; x &lt;= maxX; x++) {
+        const { u, v, w } = computeBarycentric(x, y, v0, v1, v2);
+
+        // Check if the pixel is inside the triangle
+        if (u &gt;= 0 &amp;&amp; v &gt;= 0 &amp;&amp; w &gt;= 0) {
+            // Interpolate the UV coordinates using the barycentric weights
+            const interpolatedUV = new THREE.Vector2(
+                u * uv0.x + v * uv1.x + w * uv2.x, // TODO: This is inverted...?
+                1 - (u * uv0.y + v * uv1.y + w * uv2.y) // No, this is inverted...
+            );
+
+            // Sample the texture using the interpolated UV coordinates
+            const textureColor = sampleTexture(rawImageData, rawImageData.width, rawImageData.height, interpolatedUV);
+
+            // https://stackoverflow.com/questions/4899799/whats-the-best-way-to-set-a-single-pixel-in-an-html5-canvas
+            ctx.fillStyle = "rgba("+textureColor.r+","+textureColor.g+","+textureColor.b+","+(textureColor.a/255)+")";
+            ctx.fillRect( x, y, 1, 1 );
+        }
+    }
+}
+</code></pre></div></div>
+<p><br />
+And that should do it! Let’s run this code and see what we get!</p>
+
+<h1 id="rasterized-image">Rasterized image</h1>
+<p><br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024_10_22_bad_texture.gif" alt="An animated image showing a rendered image of a basketball with a very glitchy appearance and half the basketball missing." style="max-width: 100%; height: auto;" />
+</p>
+<p><br />
+Oh…
+<br />
+Alright, well something appears to be going very wrong, but figuring out what’s going on will have to wait until next week.</p>
+
+
+        <hr>
+
+        <div class="clearfix">
+
+          
+          <a class="btn btn-primary float-left" href="/3dage_renderer/2024/10/15/rendering-wireframes.html" data-toggle="tooltip" data-placement="top" title="Bare wire(frame)s">&larr; Previous<span class="d-none d-md-inline">
+              Post</span></a>
+          
+          
+          <a class="btn btn-primary float-right" href="/3dage_renderer/2024/10/29/fixing-rasterization.html" data-toggle="tooltip" data-placement="top" title="Texture and Depth">Next<span class="d-none d-md-inline">
+              Post</span> &rarr;</a>
+          
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Footer -->
+
+<hr>
+
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto">
+        <ul class="list-inline text-center">
+          
+          
+          
+          
+          
+          
+        </ul>
+        <p class="copyright text-muted">Copyright &copy;  2024</p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/3dage_renderer/assets/vendor/startbootstrap-clean-blog/js/scripts.js"></script>
+
+<script src="/3dage_renderer/assets/scripts.js"></script>
+
+
+
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id="></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', '');
+</script>
+
+
+
+</body>
+
+</html>
