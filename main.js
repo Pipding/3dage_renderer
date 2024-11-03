@@ -262,7 +262,7 @@ function rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2) {
 
                     // Interpolate the UV coordinates using the barycentric weights
                     const interpolatedUV = new THREE.Vector2(
-                        u * uv0.x + v * uv1.x + w * uv2.x, // TODO: This is inverted...?
+                        (u * uv0.x + v * uv1.x + w * uv2.x), // TODO: This is inverted...?
                         1 - (u * uv0.y + v * uv1.y + w * uv2.y) // No, this is inverted...
                     );
 
@@ -333,8 +333,8 @@ function sampleTexture(textureData, texWidth, texHeight, uv) {
     return { r, g, b, a };
 }
 
-loadImageData("models/basketball_d_painted.png")
-loadImageData("models/uv_checker.jpg")
+loadImageData("models/basketball_d.png")
+// loadImageData("models/uv_checker.jpg")
 
 // loadObj("models/basketball_triangulated.obj", renderWireframe);
 loadObj("models/basketball_triangulated.obj", renderWithTexture);
