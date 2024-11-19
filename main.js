@@ -255,7 +255,7 @@ function rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2) {
     for (let y = minY; y <= maxY; y++) {
         for (let x = minX; x <= maxX; x++) {
             // Compute barycentric coordinates for the pixel
-            const { u, v, w } = computeBarycentric(x, y, v0, v1, v2);
+            const { u, v, w } = barycentric({x, y}, v0, v1, v2)
 
             // Check if the pixel is inside the triangle
             if (u >= 0 && v >= 0 && w >= 0) {
@@ -288,50 +288,42 @@ function rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2) {
     }
 }
 
-function renderPixel(ctx, textureColor, x, y) {
-    // https://stackoverflow.com/questions/4899799/whats-the-best-way-to-set-a-single-pixel-in-an-html5-canvas
-    ctx.fillStyle = "rgba("+textureColor.r+","+textureColor.g+","+textureColor.b+","+(textureColor.a/255)+")";
-    ctx.fillRect( x, y, 1, 1 );
-}
-
 function renderFrameBuffer(ctx) {
     let imageData = ctx.createImageData(canvas.width, canvas.height) // Match the number of pixels in the frame buffer
     imageData.data.set(frameBuffer);
     ctx.putImageData(imageData, 0, 0);
 }
 
-function computeBarycentric(x, y, v0, v1, v2) {
-    // Calculate the area of the full triangle using a cross product
-    const area = edgeFunction(v0, v1, v2);
+// https://gamedev.stackexchange.com/a/23745
+function barycentric(p, a, b, c) {
+    // Compute vectors
+    let v0 = subtract(b, a);
+    let v1 = subtract(c, a);
+    let v2 = subtract(p, a);
 
-    // Calculate the sub-area of the triangle formed with the point (x, y) and the triangle's vertices
-    const u = edgeFunction({x, y}, v1, v2) / area;  // Area of triangle (P, v1, v2)
-    const v = edgeFunction({x, y}, v2, v0) / area;  // Area of triangle (P, v2, v0)
-    const w = edgeFunction({x, y}, v0, v1) / area;  // Area of triangle (P, v0, v1)
+    // Compute dot products
+    let d00 = dot(v0, v0);
+    let d01 = dot(v0, v1);
+    let d11 = dot(v1, v1);
+    let d20 = dot(v2, v0);
+    let d21 = dot(v2, v1);
 
-    return { u, v, w }; // Barycentric coordinates
+    // Compute barycentric coordinates
+    let denom = d00 * d11 - d01 * d01;
+    let v = (d11 * d20 - d01 * d21) / denom;
+    let w = (d00 * d21 - d01 * d20) / denom;
+    let u = 1.0 - v - w;
+
+    return { u, v, w };
 }
 
+// Helper functions for vector operations
+function subtract(v1, v2) {
+    return { x: v1.x - v2.x, y: v1.y - v2.y };
+}
 
-/**
- * Calculates the edge function value for a triangle formed by three 2D vertices.
- * 
- * This function takes three 2D points (v0, v1, and v2) and computes a value 
- * indicating whether  the third point (v2) is on the "left" or "right" side 
- * of the edge formed by the first two points (v0 to v1) in a 2D space.
- *
- * The edge function value is positive if v2 is on one side of the edge v0-v1 
- * and negative if it is on the other side. This is useful in rasterization 
- * for determining if a pixel lies inside or outside of a triangle. Specifically:
- * - When used with all three vertices of a triangle, it helps identify the 
- *   "inside" area of the triangle.
- * - When used with other points, it indicates if the point is within the triangle's bounds.
- *
- * The formula used is a 2D cross product, which provides an orientation 
- * indication without explicitly calculating angles.
- */
-function edgeFunction(v0, v1, v2) {
-    return (v1.x - v0.x) * (v2.y - v0.y) - (v2.x - v0.x) * (v1.y - v0.y);
+function dot(v1, v2) {
+    return v1.x * v2.x + v1.y * v2.y;
 }
 
 function sampleTexture(textureData, texWidth, texHeight, uv) {
