@@ -16,6 +16,8 @@ let rawImageData = null;
 
 let depthBuffer = [];
 
+let frameBuffer = new Uint8ClampedArray();
+
 function loadImageData(url) {
     const image = new Image();
     image.src = url;
@@ -79,6 +81,8 @@ function loadObj(filePath, callback) {
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+
+    frameBuffer = new Uint8ClampedArray(canvas.width * canvas.height * 4);
 }
 
 // Create a canvas
@@ -230,6 +234,8 @@ function renderWithTexture() {
                 rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2, loadedDiffuseMap);
                 // drawTriangle(ctx, v0, v1, v2) // Enable this to draw wireframe
             }
+
+            renderFrameBuffer(ctx)
         }
     });
 
@@ -269,13 +275,29 @@ function rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2) {
                     // Sample the texture using the interpolated UV coordinates
                     const textureColor = sampleTexture(rawImageData, rawImageData.width, rawImageData.height, interpolatedUV);
 
-                    // https://stackoverflow.com/questions/4899799/whats-the-best-way-to-set-a-single-pixel-in-an-html5-canvas
-                    ctx.fillStyle = "rgba("+textureColor.r+","+textureColor.g+","+textureColor.b+","+(textureColor.a/255)+")";
-                    ctx.fillRect( x, y, 1, 1 );
+                    let index = (y * canvas.width + x) * 4;
+                    frameBuffer[index] = textureColor.r;
+                    frameBuffer[index + 1] = textureColor.g;
+                    frameBuffer[index + 2] = textureColor.b;
+                    frameBuffer[index + 3] = textureColor.a;
+
+                    // renderPixel(ctx, textureColor, x, y)
                 }
             }
         }
     }
+}
+
+function renderPixel(ctx, textureColor, x, y) {
+    // https://stackoverflow.com/questions/4899799/whats-the-best-way-to-set-a-single-pixel-in-an-html5-canvas
+    ctx.fillStyle = "rgba("+textureColor.r+","+textureColor.g+","+textureColor.b+","+(textureColor.a/255)+")";
+    ctx.fillRect( x, y, 1, 1 );
+}
+
+function renderFrameBuffer(ctx) {
+    let imageData = ctx.createImageData(canvas.width, canvas.height) // Match the number of pixels in the frame buffer
+    imageData.data.set(frameBuffer);
+    ctx.putImageData(imageData, 0, 0);
 }
 
 function computeBarycentric(x, y, v0, v1, v2) {
