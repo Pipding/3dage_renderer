@@ -14,7 +14,7 @@ let loadedFileType = null;
 let loadedDiffuseMap = null;
 let rawImageData = null;
 
-let depthBuffer = [];
+let depthBuffer = new Float32Array();
 
 let frameBuffer = new Uint8ClampedArray();
 
@@ -83,6 +83,7 @@ function resizeCanvas() {
     canvas.height = window.innerHeight;
 
     frameBuffer = new Uint8ClampedArray(canvas.width * canvas.height * 4);
+    depthBuffer = new Float32Array(canvas.width * canvas.height);
 }
 
 // Create a canvas
@@ -208,7 +209,7 @@ function renderWithTexture() {
 
             rotationMatrix.makeRotationFromEuler(child.rotation);
 
-            depthBuffer =  Array(canvas.width).fill().map(() => Array(canvas.width).fill(Infinity));
+            depthBuffer.fill(Infinity);
 
             // Loop through the vertices
             for (let i = 0; i < vertices.length; i += 9) { // 9 because there are 3 vertices per triangle, each with 3 components (x, y, z)
@@ -262,9 +263,10 @@ function rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2) {
 
                 // TODO: This is witchcraft you don't yet understand
                 const depth = (u * v0.z) + (v * v1.z) + (w * v2.z);
+                const depthBufferIndex = (x * canvas.height) + y;
 
-                if (depth < depthBuffer[x][y]) {
-                    depthBuffer[x][y] = depth;
+                if (depth < depthBuffer[depthBufferIndex]) {
+                    depthBuffer[depthBufferIndex] = depth;
 
                     // Interpolate the UV coordinates using the barycentric weights
                     const interpolatedUV = new THREE.Vector2(
