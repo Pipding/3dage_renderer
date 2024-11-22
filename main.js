@@ -204,18 +204,36 @@ function renderWithTexture() {
             child.rotation.y += 0.02;
             const vertices = geometry.attributes.position.array;
             const uvs = geometry.attributes.uv.array; // UV coordinates
+            const normals = geometry.attributes.normal.array; // Vertex normals
 
             var rotationMatrix = new THREE.Matrix4();
 
             rotationMatrix.makeRotationFromEuler(child.rotation);
 
             depthBuffer.fill(Infinity);
+            frameBuffer.fill({r:1, g:0, b:1, a:0})
 
             // Loop through the vertices
             for (let i = 0; i < vertices.length; i += 9) { // 9 because there are 3 vertices per triangle, each with 3 components (x, y, z)
                 let v0 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
                 let v1 = new THREE.Vector3(vertices[i + 3], vertices[i + 4], vertices[i + 5]);
                 let v2 = new THREE.Vector3(vertices[i + 6], vertices[i + 7], vertices[i + 8]);
+
+                // https://en.wikipedia.org/wiki/Back-face_culling
+                // Backface culling... can we get away without drawing this triangle?
+                // The answer is yes if:
+                // The dot product of the surace normal of this triangle and the camera-to-triangle vector is 0 or more
+                // the surface normal of a triangle is the same as the normal of any of its verts (I think)
+                let triangleSurfaceNormal = new THREE.Vector3(normals[i], normals[i + 1], normals[i + 2]);
+                let v02 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
+                v02.applyMatrix4(rotationMatrix);
+                triangleSurfaceNormal.applyMatrix4(rotationMatrix);
+
+                let cameraToTriangle = v02.sub(camera.position).dot(triangleSurfaceNormal.normalize());
+                if (cameraToTriangle >= 0) {
+                    // console.log("Skipped");
+                    continue;
+                }
 
                 v0.applyMatrix4(rotationMatrix);
                 v1.applyMatrix4(rotationMatrix);
@@ -255,6 +273,7 @@ function rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2) {
     // Loop through all pixels in the bounding box
     for (let y = minY; y <= maxY; y++) {
         for (let x = minX; x <= maxX; x++) {
+
             // Compute barycentric coordinates for the pixel
             const { u, v, w } = barycentric({x, y}, v0, v1, v2)
 
