@@ -367,12 +367,13 @@ function barycentric(p, a, b, c) {
     let v1 = {x: c.x - a.x, y: c.y - a.y}
     let v2 = {x: p.x - a.x, y: p.y - a.y}
 
-    // Compute dot products
-    let d00 = dot(v0, v0);
-    let d01 = dot(v0, v1);
-    let d11 = dot(v1, v1);
-    let d20 = dot(v2, v0);
-    let d21 = dot(v2, v1);
+    // As with subtractions, this was previously extracted to a helper function
+    // but inlining it gives a marginal performance boost
+    let d00 = v0.x * v0.x + v0.y * v0.y;
+    let d01 = v0.x * v1.x + v0.y * v1.y;
+    let d11 = v1.x * v1.x + v1.y * v1.y;
+    let d20 = v2.x * v0.x + v2.y * v0.y;
+    let d21 = v2.x * v1.x + v2.y * v1.y;
 
     // Compute barycentric coordinates
     let denom = d00 * d11 - d01 * d01;
@@ -381,10 +382,6 @@ function barycentric(p, a, b, c) {
     let u = 1.0 - v - w;
 
     return { u, v, w };
-}
-
-function dot(v1, v2) {
-    return v1.x * v2.x + v1.y * v2.y;
 }
 
 function sampleTexture(textureData, texWidth, texHeight, uv) {
