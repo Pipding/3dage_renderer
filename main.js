@@ -14,7 +14,9 @@ let loadedFileType = null;
 let loadedDiffuseMap = null;
 let rawImageData = null;
 
-let depthBuffer = [];
+let depthBuffer = new Float32Array();
+
+let frameBuffer = new Uint8ClampedArray();
 
 function loadImageData(url) {
     const image = new Image();
@@ -79,6 +81,9 @@ function loadObj(filePath, callback) {
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+
+    frameBuffer = new Uint8ClampedArray(canvas.width * canvas.height * 4);
+    depthBuffer = new Float32Array(canvas.width * canvas.height);
 }
 
 // Create a canvas
@@ -199,18 +204,36 @@ function renderWithTexture() {
             child.rotation.y += 0.02;
             const vertices = geometry.attributes.position.array;
             const uvs = geometry.attributes.uv.array; // UV coordinates
+            const normals = geometry.attributes.normal.array; // Vertex normals
 
             var rotationMatrix = new THREE.Matrix4();
 
             rotationMatrix.makeRotationFromEuler(child.rotation);
 
-            depthBuffer =  Array(canvas.width).fill().map(() => Array(canvas.width).fill(Infinity));
+            depthBuffer.fill(Infinity);
+            frameBuffer.fill({r:1, g:0, b:1, a:0})
 
             // Loop through the vertices
             for (let i = 0; i < vertices.length; i += 9) { // 9 because there are 3 vertices per triangle, each with 3 components (x, y, z)
                 let v0 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
                 let v1 = new THREE.Vector3(vertices[i + 3], vertices[i + 4], vertices[i + 5]);
                 let v2 = new THREE.Vector3(vertices[i + 6], vertices[i + 7], vertices[i + 8]);
+
+                // https://en.wikipedia.org/wiki/Back-face_culling
+                // Backface culling... can we get away without drawing this triangle?
+                // The answer is yes if:
+                // The dot product of the surace normal of this triangle and the camera-to-triangle vector is 0 or more
+                // the surface normal of a triangle is the same as the normal of any of its verts (I think)
+                let triangleSurfaceNormal = new THREE.Vector3(normals[i], normals[i + 1], normals[i + 2]);
+                let v02 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
+                v02.applyMatrix4(rotationMatrix);
+                triangleSurfaceNormal.applyMatrix4(rotationMatrix);
+
+                let cameraToTriangle = v02.sub(camera.position).dot(triangleSurfaceNormal.normalize());
+                if (cameraToTriangle >= 0) {
+                    // console.log("Skipped");
+                    continue;
+                }
 
                 v0.applyMatrix4(rotationMatrix);
                 v1.applyMatrix4(rotationMatrix);
@@ -230,6 +253,8 @@ function renderWithTexture() {
                 rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2, loadedDiffuseMap);
                 // drawTriangle(ctx, v0, v1, v2) // Enable this to draw wireframe
             }
+
+            renderFrameBuffer(ctx)
         }
     });
 
@@ -248,17 +273,19 @@ function rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2) {
     // Loop through all pixels in the bounding box
     for (let y = minY; y <= maxY; y++) {
         for (let x = minX; x <= maxX; x++) {
+
             // Compute barycentric coordinates for the pixel
-            const { u, v, w } = computeBarycentric(x, y, v0, v1, v2);
+            const { u, v, w } = barycentric({x, y}, v0, v1, v2)
 
             // Check if the pixel is inside the triangle
             if (u >= 0 && v >= 0 && w >= 0) {
 
                 // TODO: This is witchcraft you don't yet understand
                 const depth = (u * v0.z) + (v * v1.z) + (w * v2.z);
+                const depthBufferIndex = (x * canvas.height) + y;
 
-                if (depth < depthBuffer[x][y]) {
-                    depthBuffer[x][y] = depth;
+                if (depth < depthBuffer[depthBufferIndex]) {
+                    depthBuffer[depthBufferIndex] = depth;
 
                     // Interpolate the UV coordinates using the barycentric weights
                     const interpolatedUV = new THREE.Vector2(
@@ -269,47 +296,55 @@ function rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2) {
                     // Sample the texture using the interpolated UV coordinates
                     const textureColor = sampleTexture(rawImageData, rawImageData.width, rawImageData.height, interpolatedUV);
 
-                    // https://stackoverflow.com/questions/4899799/whats-the-best-way-to-set-a-single-pixel-in-an-html5-canvas
-                    ctx.fillStyle = "rgba("+textureColor.r+","+textureColor.g+","+textureColor.b+","+(textureColor.a/255)+")";
-                    ctx.fillRect( x, y, 1, 1 );
+                    let index = (y * canvas.width + x) * 4;
+                    frameBuffer[index] = textureColor.r;
+                    frameBuffer[index + 1] = textureColor.g;
+                    frameBuffer[index + 2] = textureColor.b;
+                    frameBuffer[index + 3] = textureColor.a;
+
+                    // renderPixel(ctx, textureColor, x, y)
                 }
             }
         }
     }
 }
 
-function computeBarycentric(x, y, v0, v1, v2) {
-    // Calculate the area of the full triangle using a cross product
-    const area = edgeFunction(v0, v1, v2);
-
-    // Calculate the sub-area of the triangle formed with the point (x, y) and the triangle's vertices
-    const u = edgeFunction({x, y}, v1, v2) / area;  // Area of triangle (P, v1, v2)
-    const v = edgeFunction({x, y}, v2, v0) / area;  // Area of triangle (P, v2, v0)
-    const w = edgeFunction({x, y}, v0, v1) / area;  // Area of triangle (P, v0, v1)
-
-    return { u, v, w }; // Barycentric coordinates
+function renderFrameBuffer(ctx) {
+    let imageData = ctx.createImageData(canvas.width, canvas.height) // Match the number of pixels in the frame buffer
+    imageData.data.set(frameBuffer);
+    ctx.putImageData(imageData, 0, 0);
 }
 
+// https://gamedev.stackexchange.com/a/23745
+function barycentric(p, a, b, c) {
+    // Compute vectors
+    let v0 = subtract(b, a);
+    let v1 = subtract(c, a);
+    let v2 = subtract(p, a);
 
-/**
- * Calculates the edge function value for a triangle formed by three 2D vertices.
- * 
- * This function takes three 2D points (v0, v1, and v2) and computes a value 
- * indicating whether  the third point (v2) is on the "left" or "right" side 
- * of the edge formed by the first two points (v0 to v1) in a 2D space.
- *
- * The edge function value is positive if v2 is on one side of the edge v0-v1 
- * and negative if it is on the other side. This is useful in rasterization 
- * for determining if a pixel lies inside or outside of a triangle. Specifically:
- * - When used with all three vertices of a triangle, it helps identify the 
- *   "inside" area of the triangle.
- * - When used with other points, it indicates if the point is within the triangle's bounds.
- *
- * The formula used is a 2D cross product, which provides an orientation 
- * indication without explicitly calculating angles.
- */
-function edgeFunction(v0, v1, v2) {
-    return (v1.x - v0.x) * (v2.y - v0.y) - (v2.x - v0.x) * (v1.y - v0.y);
+    // Compute dot products
+    let d00 = dot(v0, v0);
+    let d01 = dot(v0, v1);
+    let d11 = dot(v1, v1);
+    let d20 = dot(v2, v0);
+    let d21 = dot(v2, v1);
+
+    // Compute barycentric coordinates
+    let denom = d00 * d11 - d01 * d01;
+    let v = (d11 * d20 - d01 * d21) / denom;
+    let w = (d00 * d21 - d01 * d20) / denom;
+    let u = 1.0 - v - w;
+
+    return { u, v, w };
+}
+
+// Helper functions for vector operations
+function subtract(v1, v2) {
+    return { x: v1.x - v2.x, y: v1.y - v2.y };
+}
+
+function dot(v1, v2) {
+    return v1.x * v2.x + v1.y * v2.y;
 }
 
 function sampleTexture(textureData, texWidth, texHeight, uv) {
