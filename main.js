@@ -18,6 +18,31 @@ let depthBuffer = new Float32Array();
 
 let frameBuffer = new Uint8ClampedArray();
 
+let lastTime = 0;
+let frameCount = 0;
+let fps = 0;
+
+function updateFrameRate(currentTime) {
+    frameCount++;
+    if (currentTime - lastTime >= 1000) {
+        fps = frameCount;
+        frameCount = 0;
+        lastTime = currentTime;
+    }
+}
+
+function drawInfo() {
+    const text = `Canvas: ${canvas.width}x${canvas.height}, FPS: ${fps}`;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Semi-transparent background
+    ctx.fillRect(canvas.width - 260, 10, 250, 30); // Background rectangle for the text
+
+    ctx.fillStyle = 'white';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText(text, canvas.width - 10, 15); // Position of the text
+}
+
 function loadImageData(url) {
     const image = new Image();
     image.src = url;
@@ -184,13 +209,15 @@ function renderWireframe() {
 }
 
 // Function to render the wireframe
-function renderWithTexture() {
+function renderWithTexture(currentTime) {
     if (!loadedObject) return;
     if (!rawImageData) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    updateFrameRate(currentTime);
 
     // Traverse the geometry of the loaded object
     // The object is expected to load in as a THREE.Group (https://threejs.org/docs/#api/en/objects/Group)
@@ -257,6 +284,8 @@ function renderWithTexture() {
             renderFrameBuffer(ctx)
         }
     });
+
+    drawInfo();
 
     // Continue the animation loop
     requestAnimationFrame(renderWithTexture);
