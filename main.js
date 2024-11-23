@@ -118,7 +118,7 @@ function resizeCanvas() {
 
     depthBuffer = new Float32Array(canvas.width * canvas.height);
     depthBufferEmpty = new Float32Array(canvas.width * canvas.height);
-    frameBufferEmpty.fill(Infinity)
+    depthBufferEmpty.fill(Infinity)
 }
 
 // Create a canvas
@@ -252,8 +252,8 @@ function renderWithTexture(currentTime) {
 
     rotationMatrix.makeRotationFromEuler(mesh.rotation);
 
-    depthBuffer.fill(Infinity);
-    frameBuffer.set(frameBufferEmpty)
+    depthBuffer.set(depthBufferEmpty);
+    frameBuffer.set(frameBufferEmpty);
 
     // Loop through the vertices
     for (let i = 0; i < vertices.length; i += 9) { // 9 because there are 3 vertices per triangle, each with 3 components (x, y, z)
