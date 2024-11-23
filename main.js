@@ -360,9 +360,12 @@ function renderFrameBuffer(ctx) {
 // https://gamedev.stackexchange.com/a/23745
 function barycentric(p, a, b, c) {
     // Compute vectors
-    let v0 = subtract(b, a);
-    let v1 = subtract(c, a);
-    let v2 = subtract(p, a);
+    // In previous iterations this was abstracted to a "subtract" function
+    // but inlining the subtraction gives a marginal performance boost. Anecdotally
+    // in Firefox is seems to increase the average FPS by 1 or 2
+    let v0 = {x: b.x - a.x, y: b.y - a.y}
+    let v1 = {x: c.x - a.x, y: c.y - a.y}
+    let v2 = {x: p.x - a.x, y: p.y - a.y}
 
     // Compute dot products
     let d00 = dot(v0, v0);
@@ -378,11 +381,6 @@ function barycentric(p, a, b, c) {
     let u = 1.0 - v - w;
 
     return { u, v, w };
-}
-
-// Helper functions for vector operations
-function subtract(v1, v2) {
-    return { x: v1.x - v2.x, y: v1.y - v2.y };
 }
 
 function dot(v1, v2) {
