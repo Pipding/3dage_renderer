@@ -272,7 +272,7 @@ function renderWithTexture(currentTime) {
         triangleSurfaceNormal.applyMatrix4(rotationMatrix);
 
         let cameraToTriangle = v02.sub(camera.position).dot(triangleSurfaceNormal.normalize());
-        if (cameraToTriangle >= 0) {
+        if (cameraToTriangle >= 1) {
             // console.log("Skipped");
             continue;
         }
