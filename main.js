@@ -18,8 +18,10 @@ let mesh = null;
 let geometry = null;
 
 let depthBuffer = new Float32Array();
+let depthBufferEmpty = new Float32Array();
 
 let frameBuffer = new Uint8ClampedArray();
+let frameBufferEmpty = new Uint8ClampedArray();
 
 let lastTime = 0;
 let frameCount = 0;
@@ -111,7 +113,12 @@ function resizeCanvas() {
     canvas.height = window.innerHeight;
 
     frameBuffer = new Uint8ClampedArray(canvas.width * canvas.height * 4);
+    frameBufferEmpty = new Uint8ClampedArray(canvas.width * canvas.height * 4);
+    frameBufferEmpty.fill(0)
+
     depthBuffer = new Float32Array(canvas.width * canvas.height);
+    depthBufferEmpty = new Float32Array(canvas.width * canvas.height);
+    frameBufferEmpty.fill(Infinity)
 }
 
 // Create a canvas
@@ -246,7 +253,7 @@ function renderWithTexture(currentTime) {
     rotationMatrix.makeRotationFromEuler(mesh.rotation);
 
     depthBuffer.fill(Infinity);
-    frameBuffer.fill({r:1, g:0, b:1, a:0})
+    frameBuffer.set(frameBufferEmpty)
 
     // Loop through the vertices
     for (let i = 0; i < vertices.length; i += 9) { // 9 because there are 3 vertices per triangle, each with 3 components (x, y, z)
