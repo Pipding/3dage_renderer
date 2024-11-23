@@ -14,9 +14,14 @@ let loadedFileType = null;
 let loadedDiffuseMap = null;
 let rawImageData = null;
 
+let mesh = null;
+let geometry = null;
+
 let depthBuffer = new Float32Array();
+let depthBufferEmpty = new Float32Array();
 
 let frameBuffer = new Uint8ClampedArray();
+let frameBufferEmpty = new Uint8ClampedArray();
 
 let lastTime = 0;
 let frameCount = 0;
@@ -108,7 +113,12 @@ function resizeCanvas() {
     canvas.height = window.innerHeight;
 
     frameBuffer = new Uint8ClampedArray(canvas.width * canvas.height * 4);
+    frameBufferEmpty = new Uint8ClampedArray(canvas.width * canvas.height * 4);
+    frameBufferEmpty.fill(0)
+
     depthBuffer = new Float32Array(canvas.width * canvas.height);
+    depthBufferEmpty = new Float32Array(canvas.width * canvas.height);
+    depthBufferEmpty.fill(Infinity)
 }
 
 // Create a canvas
@@ -212,6 +222,14 @@ function renderWireframe() {
 function renderWithTexture(currentTime) {
     if (!loadedObject) return;
     if (!rawImageData) return;
+    if (!mesh) {
+        loadedObject.traverse((child) => {
+            if (child.isMesh) {
+                mesh = child;
+                geometry = mesh.geometry;
+            }
+        });
+    }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "black";
@@ -223,67 +241,62 @@ function renderWithTexture(currentTime) {
     // The object is expected to load in as a THREE.Group (https://threejs.org/docs/#api/en/objects/Group)
     // THREE.Group is a subclass of THREE.Object3D (https://threejs.org/docs/index.html#api/en/core/Object3D)
     // so we can call .traverse() on it to iterate through its elements
-    loadedObject.traverse((child) => {
-        if (child.isMesh) {
-            const geometry = child.geometry;
-            // console.log(child) // Debug
-            child.rotation.x += 0.05;
-            child.rotation.y += 0.02;
-            const vertices = geometry.attributes.position.array;
-            const uvs = geometry.attributes.uv.array; // UV coordinates
-            const normals = geometry.attributes.normal.array; // Vertex normals
+    // console.log(mesh) // Debug
+    mesh.rotation.x += 0.05;
+    mesh.rotation.y += 0.02;
+    const vertices = geometry.attributes.position.array;
+    const uvs = geometry.attributes.uv.array; // UV coordinates
+    const normals = geometry.attributes.normal.array; // Vertex normals
 
-            var rotationMatrix = new THREE.Matrix4();
+    var rotationMatrix = new THREE.Matrix4();
 
-            rotationMatrix.makeRotationFromEuler(child.rotation);
+    rotationMatrix.makeRotationFromEuler(mesh.rotation);
 
-            depthBuffer.fill(Infinity);
-            frameBuffer.fill({r:1, g:0, b:1, a:0})
+    depthBuffer.set(depthBufferEmpty);
+    frameBuffer.set(frameBufferEmpty);
 
-            // Loop through the vertices
-            for (let i = 0; i < vertices.length; i += 9) { // 9 because there are 3 vertices per triangle, each with 3 components (x, y, z)
-                let v0 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
-                let v1 = new THREE.Vector3(vertices[i + 3], vertices[i + 4], vertices[i + 5]);
-                let v2 = new THREE.Vector3(vertices[i + 6], vertices[i + 7], vertices[i + 8]);
+    // Loop through the vertices
+    for (let i = 0; i < vertices.length; i += 9) { // 9 because there are 3 vertices per triangle, each with 3 components (x, y, z)
+        let v0 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
+        let v1 = new THREE.Vector3(vertices[i + 3], vertices[i + 4], vertices[i + 5]);
+        let v2 = new THREE.Vector3(vertices[i + 6], vertices[i + 7], vertices[i + 8]);
 
-                // https://en.wikipedia.org/wiki/Back-face_culling
-                // Backface culling... can we get away without drawing this triangle?
-                // The answer is yes if:
-                // The dot product of the surace normal of this triangle and the camera-to-triangle vector is 0 or more
-                // the surface normal of a triangle is the same as the normal of any of its verts (I think)
-                let triangleSurfaceNormal = new THREE.Vector3(normals[i], normals[i + 1], normals[i + 2]);
-                let v02 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
-                v02.applyMatrix4(rotationMatrix);
-                triangleSurfaceNormal.applyMatrix4(rotationMatrix);
+        // https://en.wikipedia.org/wiki/Back-face_culling
+        // Backface culling... can we get away without drawing this triangle?
+        // The answer is yes if:
+        // The dot product of the surace normal of this triangle and the camera-to-triangle vector is 0 or more
+        // the surface normal of a triangle is the same as the normal of any of its verts (I think)
+        let triangleSurfaceNormal = new THREE.Vector3(normals[i], normals[i + 1], normals[i + 2]);
+        let v02 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
+        v02.applyMatrix4(rotationMatrix);
+        triangleSurfaceNormal.applyMatrix4(rotationMatrix);
 
-                let cameraToTriangle = v02.sub(camera.position).dot(triangleSurfaceNormal.normalize());
-                if (cameraToTriangle >= 0) {
-                    // console.log("Skipped");
-                    continue;
-                }
-
-                v0.applyMatrix4(rotationMatrix);
-                v1.applyMatrix4(rotationMatrix);
-                v2.applyMatrix4(rotationMatrix);
-
-                // Project vertices into screen space
-                v0 = projectVertex(v0);
-                v1 = projectVertex(v1);
-                v2 = projectVertex(v2);
-
-                // Get the corresponding UVs for the triangle
-                let uv0 = new THREE.Vector2(uvs[i / 3 * 2], uvs[i / 3 * 2 + 1]);
-                let uv1 = new THREE.Vector2(uvs[(i / 3 + 1) * 2], uvs[(i / 3 + 1) * 2 + 1]);
-                let uv2 = new THREE.Vector2(uvs[(i / 3 + 2) * 2], uvs[(i / 3 + 2) * 2 + 1]);
-
-                // Triangle in screen space is defined by v0, v1, v2
-                rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2, loadedDiffuseMap);
-                // drawTriangle(ctx, v0, v1, v2) // Enable this to draw wireframe
-            }
-
-            renderFrameBuffer(ctx)
+        let cameraToTriangle = v02.sub(camera.position).dot(triangleSurfaceNormal.normalize());
+        if (cameraToTriangle >= 1) {
+            // console.log("Skipped");
+            continue;
         }
-    });
+
+        v0.applyMatrix4(rotationMatrix);
+        v1.applyMatrix4(rotationMatrix);
+        v2.applyMatrix4(rotationMatrix);
+
+        // Project vertices into screen space
+        v0 = projectVertex(v0);
+        v1 = projectVertex(v1);
+        v2 = projectVertex(v2);
+
+        // Get the corresponding UVs for the triangle
+        let uv0 = new THREE.Vector2(uvs[i / 3 * 2], uvs[i / 3 * 2 + 1]);
+        let uv1 = new THREE.Vector2(uvs[(i / 3 + 1) * 2], uvs[(i / 3 + 1) * 2 + 1]);
+        let uv2 = new THREE.Vector2(uvs[(i / 3 + 2) * 2], uvs[(i / 3 + 2) * 2 + 1]);
+
+        // Triangle in screen space is defined by v0, v1, v2
+        rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2, loadedDiffuseMap);
+        // drawTriangle(ctx, v0, v1, v2) // Enable this to draw wireframe
+    }
+
+    renderFrameBuffer(ctx)
 
     drawInfo();
 
@@ -347,16 +360,20 @@ function renderFrameBuffer(ctx) {
 // https://gamedev.stackexchange.com/a/23745
 function barycentric(p, a, b, c) {
     // Compute vectors
-    let v0 = subtract(b, a);
-    let v1 = subtract(c, a);
-    let v2 = subtract(p, a);
+    // In previous iterations this was abstracted to a "subtract" function
+    // but inlining the subtraction gives a marginal performance boost. Anecdotally
+    // in Firefox is seems to increase the average FPS by 1 or 2
+    let v0 = {x: b.x - a.x, y: b.y - a.y}
+    let v1 = {x: c.x - a.x, y: c.y - a.y}
+    let v2 = {x: p.x - a.x, y: p.y - a.y}
 
-    // Compute dot products
-    let d00 = dot(v0, v0);
-    let d01 = dot(v0, v1);
-    let d11 = dot(v1, v1);
-    let d20 = dot(v2, v0);
-    let d21 = dot(v2, v1);
+    // As with subtractions, this was previously extracted to a helper function
+    // but inlining it gives a marginal performance boost
+    let d00 = v0.x * v0.x + v0.y * v0.y;
+    let d01 = v0.x * v1.x + v0.y * v1.y;
+    let d11 = v1.x * v1.x + v1.y * v1.y;
+    let d20 = v2.x * v0.x + v2.y * v0.y;
+    let d21 = v2.x * v1.x + v2.y * v1.y;
 
     // Compute barycentric coordinates
     let denom = d00 * d11 - d01 * d01;
@@ -365,15 +382,6 @@ function barycentric(p, a, b, c) {
     let u = 1.0 - v - w;
 
     return { u, v, w };
-}
-
-// Helper functions for vector operations
-function subtract(v1, v2) {
-    return { x: v1.x - v2.x, y: v1.y - v2.y };
-}
-
-function dot(v1, v2) {
-    return v1.x * v2.x + v1.y * v2.y;
 }
 
 function sampleTexture(textureData, texWidth, texHeight, uv) {
