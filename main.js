@@ -16,6 +16,9 @@ let rawImageData = null;
 
 let mesh = null;
 let geometry = null;
+let vertices = null;
+let uvs = null; // UV coordinates
+let normals = null; // Vertex normals
 
 let depthBuffer = new Float32Array();
 let depthBufferEmpty = new Float32Array();
@@ -232,6 +235,9 @@ function renderWithTexture(currentTime) {
             if (child.isMesh) {
                 mesh = child;
                 geometry = mesh.geometry;
+                vertices = geometry.attributes.position.array;
+                uvs = geometry.attributes.uv.array; // UV coordinates
+                normals = geometry.attributes.normal.array; // Vertex normals
             }
         });
     }
@@ -252,11 +258,6 @@ function renderWithTexture(currentTime) {
     mesh.rotation.x += 0.05;
     mesh.rotation.y += 0.02;
     mesh.rotationNeedsUpdate = true;
-
-    const vertices = geometry.attributes.position.array;
-    const uvs = geometry.attributes.uv.array; // UV coordinates
-    const normals = geometry.attributes.normal.array; // Vertex normals
-
 
     depthBuffer.set(depthBufferEmpty);
     frameBuffer.set(frameBufferEmpty);
