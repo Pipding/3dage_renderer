@@ -164,7 +164,7 @@ function projectVertex(vertex) {
 }
 
 function drawTriangle(ctx, v0, v1, v2) {
-    ctx.strokeStyle = 'white';
+    ctx.strokeStyle = 'black';
     ctx.beginPath();
     ctx.moveTo(v0.x, v0.y);
     ctx.lineTo(v1.x, v1.y);
@@ -259,48 +259,44 @@ function renderWithTexture(currentTime) {
     mesh.rotation.y += 0.02;
     mesh.rotationNeedsUpdate = true;
 
+    // Transform and project all vertices
+    const transformedVertices = [];
+    const projectedVertices = [];
+    let tempV0 = new THREE.Vector3;
+    for (let i = 0; i < vertices.length; i += 3) {
+        tempV0.set(vertices[i], vertices[i + 1], vertices[i + 2]).applyMatrix4(rotationMatrix);
+        transformedVertices[i / 3] = tempV0.clone();
+        projectedVertices[i / 3] = projectVertex(tempV0);
+    }
+
     depthBuffer.set(depthBufferEmpty);
     frameBuffer.set(frameBufferEmpty);
 
-    // Loop through the vertices
+    // Draw triangles
     for (let i = 0; i < vertices.length; i += 9) { // 9 because there are 3 vertices per triangle, each with 3 components (x, y, z)
-        let v0 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
-        let v1 = new THREE.Vector3(vertices[i + 3], vertices[i + 4], vertices[i + 5]);
-        let v2 = new THREE.Vector3(vertices[i + 6], vertices[i + 7], vertices[i + 8]);
+        let v0 = transformedVertices[(i/3)];
+        let v1 = transformedVertices[(i/3) + 1];
+        let v2 = transformedVertices[(i/3) + 2];
+
+        // Dividing by 3 and multiplying by 2 in UV lookup because UVs have only 2 elements
+        const uv0 = { x: uvs[i/3 * 2], y: uvs[i/3 * 2 + 1] };
+        const uv1 = { x: uvs[(i/3 + 1) * 2], y: uvs[(i/3 + 1) * 2 + 1] };
+        const uv2 = { x: uvs[(i/3 + 2) * 2], y: uvs[(i/3 + 2) * 2 + 1] };
 
         // https://en.wikipedia.org/wiki/Back-face_culling
         // Backface culling... can we get away without drawing this triangle?
         // The answer is yes if:
         // The dot product of the surace normal of this triangle and the camera-to-triangle vector is 0 or more
         // the surface normal of a triangle is the same as the normal of any of its verts (I think)
-        let triangleSurfaceNormal = new THREE.Vector3(normals[i], normals[i + 1], normals[i + 2]);
-        let v02 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
-        v02.applyMatrix4(rotationMatrix);
-        triangleSurfaceNormal.applyMatrix4(rotationMatrix);
+        let triangleSurfaceNormal = new THREE.Vector3(normals[i], normals[i + 1], normals[i + 2]).applyMatrix4(rotationMatrix);
 
-        let cameraToTriangle = v02.sub(camera.position).dot(triangleSurfaceNormal.normalize());
+        let cameraToTriangle = v0.sub(camera.position).dot(triangleSurfaceNormal);
         if (cameraToTriangle >= 1) {
-            // console.log("Skipped");
             continue;
         }
 
-        v0.applyMatrix4(rotationMatrix);
-        v1.applyMatrix4(rotationMatrix);
-        v2.applyMatrix4(rotationMatrix);
-
-        // Project vertices into screen space
-        v0 = projectVertex(v0);
-        v1 = projectVertex(v1);
-        v2 = projectVertex(v2);
-
-        // Get the corresponding UVs for the triangle
-        let uv0 = new THREE.Vector2(uvs[i / 3 * 2], uvs[i / 3 * 2 + 1]);
-        let uv1 = new THREE.Vector2(uvs[(i / 3 + 1) * 2], uvs[(i / 3 + 1) * 2 + 1]);
-        let uv2 = new THREE.Vector2(uvs[(i / 3 + 2) * 2], uvs[(i / 3 + 2) * 2 + 1]);
-
-        // Triangle in screen space is defined by v0, v1, v2
-        rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2, loadedDiffuseMap);
-        // drawTriangle(ctx, v0, v1, v2) // Enable this to draw wireframe
+        rasterizeTriangle(ctx, projectedVertices[i/3], projectedVertices[(i/3) + 1], projectedVertices[(i/3) + 2], uv0, uv1, uv2, loadedDiffuseMap);
+        // drawTriangle(ctx, projectedVertices[i/3], projectedVertices[(i/3) + 1], projectedVertices[(i/3) + 2]) // Enable this to draw wireframe
     }
 
     renderFrameBuffer(ctx)
