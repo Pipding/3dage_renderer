@@ -23,6 +23,8 @@ let depthBufferEmpty = new Float32Array();
 let frameBuffer = new Uint8ClampedArray();
 let frameBufferEmpty = new Uint8ClampedArray();
 
+var rotationMatrix = new THREE.Matrix4();
+
 let lastTime = 0;
 let frameCount = 0;
 let fps = 0;
@@ -218,10 +220,13 @@ function renderWireframe() {
     requestAnimationFrame(renderWireframe);
 }
 
-// Function to render the wireframe
+/**
+ * Renders the loaded mesh with the loaded texture applied
+ * @param currentTime Timestamp provided by requestAnimationFrame use to calculate elapsed time between frames
+ * @returns 
+ */
 function renderWithTexture(currentTime) {
-    if (!loadedObject) return;
-    if (!rawImageData) return;
+    if (!loadedObject || !rawImageData) return;
     if (!mesh) {
         loadedObject.traverse((child) => {
             if (child.isMesh) {
@@ -231,26 +236,27 @@ function renderWithTexture(currentTime) {
         });
     }
 
+    // Clear the canvas to black
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     updateFrameRate(currentTime);
 
-    // Traverse the geometry of the loaded object
-    // The object is expected to load in as a THREE.Group (https://threejs.org/docs/#api/en/objects/Group)
-    // THREE.Group is a subclass of THREE.Object3D (https://threejs.org/docs/index.html#api/en/core/Object3D)
-    // so we can call .traverse() on it to iterate through its elements
-    // console.log(mesh) // Debug
+    if (mesh.rotationNeedsUpdate) {
+        rotationMatrix.makeRotationFromEuler(mesh.rotation);
+        mesh.rotationNeedsUpdate = false;
+    }
+
+    // Rotation just for testing
     mesh.rotation.x += 0.05;
     mesh.rotation.y += 0.02;
+    mesh.rotationNeedsUpdate = true;
+
     const vertices = geometry.attributes.position.array;
     const uvs = geometry.attributes.uv.array; // UV coordinates
     const normals = geometry.attributes.normal.array; // Vertex normals
 
-    var rotationMatrix = new THREE.Matrix4();
-
-    rotationMatrix.makeRotationFromEuler(mesh.rotation);
 
     depthBuffer.set(depthBufferEmpty);
     frameBuffer.set(frameBufferEmpty);
