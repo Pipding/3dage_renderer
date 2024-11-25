@@ -16,12 +16,17 @@ let rawImageData = null;
 
 let mesh = null;
 let geometry = null;
+let vertices = null;
+let uvs = null; // UV coordinates
+let normals = null; // Vertex normals
 
 let depthBuffer = new Float32Array();
 let depthBufferEmpty = new Float32Array();
 
 let frameBuffer = new Uint8ClampedArray();
 let frameBufferEmpty = new Uint8ClampedArray();
+
+var rotationMatrix = new THREE.Matrix4();
 
 let lastTime = 0;
 let frameCount = 0;
@@ -138,6 +143,10 @@ const camera = {
     fov: 45
 };
 
+// Set up a light
+const lightDirection = new THREE.Vector3(0, -10, -10).normalize();
+const lightColour = new THREE.Color(0, 0, 0);
+
 // Function to project 3D vertex into 2D space
 function projectVertex(vertex) {
     let aspectRatio = canvas.width / canvas.height;
@@ -159,7 +168,7 @@ function projectVertex(vertex) {
 }
 
 function drawTriangle(ctx, v0, v1, v2) {
-    ctx.strokeStyle = 'white';
+    ctx.strokeStyle = 'black';
     ctx.beginPath();
     ctx.moveTo(v0.x, v0.y);
     ctx.lineTo(v1.x, v1.y);
@@ -218,82 +227,87 @@ function renderWireframe() {
     requestAnimationFrame(renderWireframe);
 }
 
-// Function to render the wireframe
+/**
+ * Renders the loaded mesh with the loaded texture applied
+ * @param currentTime Timestamp provided by requestAnimationFrame use to calculate elapsed time between frames
+ * @returns 
+ */
 function renderWithTexture(currentTime) {
-    if (!loadedObject) return;
-    if (!rawImageData) return;
+    if (!loadedObject || !rawImageData) return;
     if (!mesh) {
         loadedObject.traverse((child) => {
             if (child.isMesh) {
                 mesh = child;
                 geometry = mesh.geometry;
+                vertices = geometry.attributes.position.array;
+                uvs = geometry.attributes.uv.array; // UV coordinates
+                normals = geometry.attributes.normal.array; // Vertex normals
             }
         });
     }
 
+    // Clear the canvas to black
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     updateFrameRate(currentTime);
 
-    // Traverse the geometry of the loaded object
-    // The object is expected to load in as a THREE.Group (https://threejs.org/docs/#api/en/objects/Group)
-    // THREE.Group is a subclass of THREE.Object3D (https://threejs.org/docs/index.html#api/en/core/Object3D)
-    // so we can call .traverse() on it to iterate through its elements
-    // console.log(mesh) // Debug
+    if (mesh.rotationNeedsUpdate) {
+        rotationMatrix.makeRotationFromEuler(mesh.rotation);
+        mesh.rotationNeedsUpdate = false;
+    }
+
+    // Rotation just for testing
     mesh.rotation.x += 0.05;
     mesh.rotation.y += 0.02;
-    const vertices = geometry.attributes.position.array;
-    const uvs = geometry.attributes.uv.array; // UV coordinates
-    const normals = geometry.attributes.normal.array; // Vertex normals
+    mesh.rotationNeedsUpdate = true;
 
-    var rotationMatrix = new THREE.Matrix4();
-
-    rotationMatrix.makeRotationFromEuler(mesh.rotation);
+    // Transform and project all vertices
+    const transformedVertices = [];
+    const transformedNormals = [];
+    const projectedVertices = [];
+    let tempV0 = new THREE.Vector3;
+    for (let i = 0; i < vertices.length; i += 3) {
+        tempV0.set(vertices[i], vertices[i + 1], vertices[i + 2]).applyMatrix4(rotationMatrix);
+        transformedVertices[i / 3] = tempV0.clone();
+        projectedVertices[i / 3] = projectVertex(tempV0);
+        tempV0.set(normals[i], normals[i + 1], normals[i + 2]).applyMatrix4(rotationMatrix);
+        transformedNormals[i / 3] = tempV0.clone();
+    }
 
     depthBuffer.set(depthBufferEmpty);
     frameBuffer.set(frameBufferEmpty);
 
-    // Loop through the vertices
+    // Draw triangles
     for (let i = 0; i < vertices.length; i += 9) { // 9 because there are 3 vertices per triangle, each with 3 components (x, y, z)
-        let v0 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
-        let v1 = new THREE.Vector3(vertices[i + 3], vertices[i + 4], vertices[i + 5]);
-        let v2 = new THREE.Vector3(vertices[i + 6], vertices[i + 7], vertices[i + 8]);
+        let v0 = transformedVertices[(i/3)];
+        let v1 = transformedVertices[(i/3) + 1];
+        let v2 = transformedVertices[(i/3) + 2];
+
+        // Dividing by 3 and multiplying by 2 in UV lookup because UVs have only 2 elements
+        const uv0 = { x: uvs[i/3 * 2], y: uvs[i/3 * 2 + 1] };
+        const uv1 = { x: uvs[(i/3 + 1) * 2], y: uvs[(i/3 + 1) * 2 + 1] };
+        const uv2 = { x: uvs[(i/3 + 2) * 2], y: uvs[(i/3 + 2) * 2 + 1] };
 
         // https://en.wikipedia.org/wiki/Back-face_culling
         // Backface culling... can we get away without drawing this triangle?
         // The answer is yes if:
         // The dot product of the surace normal of this triangle and the camera-to-triangle vector is 0 or more
         // the surface normal of a triangle is the same as the normal of any of its verts (I think)
-        let triangleSurfaceNormal = new THREE.Vector3(normals[i], normals[i + 1], normals[i + 2]);
-        let v02 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
-        v02.applyMatrix4(rotationMatrix);
-        triangleSurfaceNormal.applyMatrix4(rotationMatrix);
+        let triangleSurfaceNormal = new THREE.Vector3(normals[i], normals[i + 1], normals[i + 2]).applyMatrix4(rotationMatrix);
 
-        let cameraToTriangle = v02.sub(camera.position).dot(triangleSurfaceNormal.normalize());
+        let cameraToTriangle = v0.sub(camera.position).dot(triangleSurfaceNormal);
         if (cameraToTriangle >= 1) {
-            // console.log("Skipped");
             continue;
         }
 
-        v0.applyMatrix4(rotationMatrix);
-        v1.applyMatrix4(rotationMatrix);
-        v2.applyMatrix4(rotationMatrix);
-
-        // Project vertices into screen space
-        v0 = projectVertex(v0);
-        v1 = projectVertex(v1);
-        v2 = projectVertex(v2);
-
-        // Get the corresponding UVs for the triangle
-        let uv0 = new THREE.Vector2(uvs[i / 3 * 2], uvs[i / 3 * 2 + 1]);
-        let uv1 = new THREE.Vector2(uvs[(i / 3 + 1) * 2], uvs[(i / 3 + 1) * 2 + 1]);
-        let uv2 = new THREE.Vector2(uvs[(i / 3 + 2) * 2], uvs[(i / 3 + 2) * 2 + 1]);
-
-        // Triangle in screen space is defined by v0, v1, v2
-        rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2, loadedDiffuseMap);
-        // drawTriangle(ctx, v0, v1, v2) // Enable this to draw wireframe
+        rasterizeTriangle(
+            projectedVertices[i/3], projectedVertices[(i/3) + 1], projectedVertices[(i/3) + 2], // Vertices
+            uv0, uv1, uv2, // UVs
+            transformedNormals[i/3], transformedNormals[(i/3) + 1], transformedNormals[(i/3) + 2]// Normals
+        );
+        // drawTriangle(ctx, projectedVertices[i/3], projectedVertices[(i/3) + 1], projectedVertices[(i/3) + 2]) // Enable this to draw wireframe
     }
 
     renderFrameBuffer(ctx)
@@ -304,7 +318,7 @@ function renderWithTexture(currentTime) {
     requestAnimationFrame(renderWithTexture);
 }
 
-function rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2) {
+function rasterizeTriangle(v0, v1, v2, uv0, uv1, uv2, normal0, normal1, normal2) {
     // Calculate the bounding box of the triangle
     // The mins and maxes are floored and ceilinged because they're used array indices
     const minX = Math.floor(Math.min(v0.x, v1.x, v2.x));
@@ -317,35 +331,58 @@ function rasterizeTriangle(ctx, v0, v1, v2, uv0, uv1, uv2) {
         for (let x = minX; x <= maxX; x++) {
 
             // Compute barycentric coordinates for the pixel
+            // u, v and w are basically scalar values. When dealing with vertex-specific
+            // data, we can multiple v0 by u, v1 by v and v2 by w to get interpolated 
+            // values for the pixel we're currently dealing with
             const { u, v, w } = barycentric({x, y}, v0, v1, v2)
 
-            // Check if the pixel is inside the triangle
-            if (u >= 0 && v >= 0 && w >= 0) {
+            // Skip this pixel if it is not inside the triangle
+            if ( u < 0 || v < 0 || w < 0) {
+                continue;
+            }
 
-                // TODO: This is witchcraft you don't yet understand
-                const depth = (u * v0.z) + (v * v1.z) + (w * v2.z);
-                const depthBufferIndex = (x * canvas.height) + y;
+            // Calculate the depth of this pixel by weighting each of the vertices using 
+            // u, v and w and then adding the results together.
+            const depth = (u * v0.z) + (v * v1.z) + (w * v2.z);
+            const depthBufferIndex = (x * canvas.height) + y;
 
-                if (depth < depthBuffer[depthBufferIndex]) {
-                    depthBuffer[depthBufferIndex] = depth;
+            if (depth < depthBuffer[depthBufferIndex]) {
+                depthBuffer[depthBufferIndex] = depth;
 
-                    // Interpolate the UV coordinates using the barycentric weights
-                    const interpolatedUV = new THREE.Vector2(
-                        (u * uv0.x + v * uv1.x + w * uv2.x), // TODO: This is inverted...?
-                        1 - (u * uv0.y + v * uv1.y + w * uv2.y) // No, this is inverted...
-                    );
+                // Interpolate the UV coordinates using the barycentric weights
+                const interpolatedUV = new THREE.Vector2(
+                    (u * uv0.x + v * uv1.x + w * uv2.x), // TODO: This is inverted...?
+                    1 - (u * uv0.y + v * uv1.y + w * uv2.y) // No, this is inverted...
+                );
 
-                    // Sample the texture using the interpolated UV coordinates
-                    const textureColor = sampleTexture(rawImageData, rawImageData.width, rawImageData.height, interpolatedUV);
+                // Sample the texture using the interpolated UV coordinates
+                const textureColour = sampleTexture(rawImageData, rawImageData.width, rawImageData.height, interpolatedUV);
 
-                    let index = (y * canvas.width + x) * 4;
-                    frameBuffer[index] = textureColor.r;
-                    frameBuffer[index + 1] = textureColor.g;
-                    frameBuffer[index + 2] = textureColor.b;
-                    frameBuffer[index + 3] = textureColor.a;
+                const interpolatedNormal = new THREE.Vector3(
+                    (u * normal0.x + v * normal1.x + w * normal2.x),
+                    (u * normal0.y + v * normal1.y + w * normal2.y),
+                    (u * normal0.z + v * normal1.z + w * normal2.z)
+                );
 
-                    // renderPixel(ctx, textureColor, x, y)
+                // Here we compute the diffuse factor, i.e. how much light this pixel reflects. This is a simplified version 
+                // of the formula found here: https://www.scratchapixel.com/lessons/3d-basic-rendering/introduction-to-shading/diffuse-lambertian-shading.html
+                // that being "Diffuse Surface Color = Incident Light Energy . N . L."
+                // In this simplification we're ignoring light intensity because the light has uniform intensity. This leaves just N (the interpolated surface normal)
+                // and L (the normalized light direction)
+                const diffuse = Math.max(interpolatedNormal.dot(lightDirection), 0);
+
+                // As ever, inlining this calculation improves performance over calculating things separately
+                const finalColour = {
+                    r: lightColour.r + textureColour.r * diffuse,
+                    g: lightColour.g + textureColour.g * diffuse,
+                    b: lightColour.b + textureColour.b * diffuse
                 }
+
+                let index = (y * canvas.width + x) * 4;
+                frameBuffer[index] = finalColour.r;
+                frameBuffer[index + 1] = finalColour.g;
+                frameBuffer[index + 2] = finalColour.b;
+                frameBuffer[index + 3] = 255;
             }
         }
     }
