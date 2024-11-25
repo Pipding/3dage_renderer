@@ -371,6 +371,9 @@ function rasterizeTriangle(v0, v1, v2, uv0, uv1, uv2, normal0, normal1, normal2)
                 // and L (the normalized light direction)
                 const diffuse = Math.max(interpolatedNormal.dot(lightDirection), 0);
 
+                // We're basically only implementing the Lambertian illumination model, not Phong shading, because we ignore the specular element.
+                // We are assuming ambient is a constant though, so it's like 2/3 Phong? https://stackoverflow.com/a/15802920
+
                 // As ever, inlining this calculation improves performance over calculating things separately
                 const finalColour = {
                     r: lightColour.r + textureColour.r * diffuse,
