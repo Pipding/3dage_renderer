@@ -12,6 +12,7 @@ let loadedObject = null;
 let loadedFileType = null;
 
 let diffuseMap = null;
+let normalMap = null;
 
 let mesh = null;
 let geometry = null;
@@ -52,7 +53,7 @@ function drawInfo() {
     ctx.fillText(text, canvas.width - 10, 15); // Position of the text
 }
 
-function loadImageData(url) {
+function loadDiffuseMap(url) {
     const image = new Image();
     image.src = url;
 
@@ -73,7 +74,35 @@ function loadImageData(url) {
 
         // Call the callback function with the image data
         diffuseMap = ({
-            data: imageData.data, // Raw pixel data (Uint8ClampedArray)
+            data: imageData.data,
+            width: image.width,
+            height: image.height
+        });
+    };
+}
+
+function loadNormalMap(url) {
+    const image = new Image();
+    image.src = url;
+
+    image.onload = function() {
+        // Create an off-screen canvas to extract pixel data
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+
+        // Set the canvas size to match the image dimensions
+        canvas.width = image.width;
+        canvas.height = image.height;
+
+        // Draw the image onto the canvas
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        // Extract the pixel data (RGBA values)
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+        // Call the callback function with the image data
+        normalMap = ({
+            data: imageData.data,
             width: image.width,
             height: image.height
         });
@@ -232,7 +261,7 @@ function renderWireframe() {
  * @returns 
  */
 function renderWithTexture(currentTime) {
-    if (!loadedObject || !diffuseMap) return;
+    if (!loadedObject || !diffuseMap || !normalMap) return;
     if (!mesh) {
         loadedObject.traverse((child) => {
             if (child.isMesh) {
@@ -356,6 +385,7 @@ function rasterizeTriangle(v0, v1, v2, uv0, uv1, uv2, normal0, normal1, normal2)
 
                 // Sample the texture using the interpolated UV coordinates
                 const textureColour = sampleTexture(diffuseMap, diffuseMap.width, diffuseMap.height, interpolatedUV);
+                const normalColour = sampleTexture(normalMap, normalMap.width, normalMap.height, interpolatedUV);
 
                 const interpolatedNormal = new THREE.Vector3(
                     (u * normal0.x + v * normal1.x + w * normal2.x),
@@ -444,7 +474,8 @@ function sampleTexture(textureData, texWidth, texHeight, uv) {
     return { r, g, b, a };
 }
 
-loadImageData("models/basketball_d.png")
+loadDiffuseMap("models/basketball_d.png")
+loadNormalMap("models/basketball_n.png")
 // loadImageData("models/uv_checker.jpg")
 
 // loadObj("models/basketball_triangulated.obj", renderWireframe);
