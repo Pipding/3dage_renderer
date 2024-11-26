@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <link rel="icon" href="/3dage_renderer/assets/images/favicon.ico">
+
+  <title>
+    Shady Business - Coordinates to Canvas
+    
+  </title>
+
+  <meta name="description" content="Shading has been one of the more daunting features because it’s kind of make-or-break. If I couldn’t get shading working with decent performance, the ‘impres...">
+
+  <link href='https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+  <link href='https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+  <script src="https://use.fontawesome.com/releases/v5.15.3/js/all.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="/3dage_renderer/assets/main.css">
+  <link rel="canonical" href="https://pipding.github.io//3dage_renderer/2024/11/12/add_shading.html">
+  <link rel="alternate" type="application/rss+xml" title="Coordinates to Canvas" href="/3dage_renderer/feed.xml">
+
+</head>
+
+
+<body>
+
+  <!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-light fixed-top" id="mainNav">
+  <div class="container">
+    <a class="navbar-brand" href="/3dage_renderer/">Coordinates to Canvas</a>
+    <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+      Menu
+      <i class="fa fa-bars"></i>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarResponsive">
+      <ul class="navbar-nav ml-auto">
+      </ul>
+    </div>
+  </div>
+</nav>
+
+
+  <!-- Page Header -->
+
+<header class="masthead" style="background-image: url('/3dage_renderer/assets/images/2024-11-12_shaded_render_small.gif')">
+  
+    <div class="overlay"></div>
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto">
+          <div class="post-heading">
+            <h1>Shady Business</h1>
+            
+            <h2 class="subheading">Implementing Lambertian illumination, week ending 2024-11-12</h2>
+            
+            <span class="meta">Posted by
+              <a href="#">Ryan</a>
+              on November 12, 2024 &middot; <span class="reading-time" title="Estimated read time">
+  
+   9 mins  read </span>
+
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto">
+
+        <p>Shading has been one of the more daunting features because it’s kind of make-or-break. If I couldn’t get shading working with decent performance, the ‘impressiveness’ of the project would be severely diminished. I’m going to spoil the ending of this post; here’s a shaded basketball rendering at ~45 FPS;
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024-11-12_shaded_render_small_cropped.gif" alt="An animated gif of a 3D render of a spinning basketball" style="max-width: 100%; height: auto;" />
+</p>
+
+<h1 id="deciding-on-a-shading-model">Deciding on a Shading Model</h1>
+<p>Implementing shading turns out not to be so complex, but figuring out how to do it is. It’s very difficult to find relevant resources because the majority of tutorials and blogs discussing shading are written with shaders in mind. Shaders are tiny programs which run on the GPU - i.e. they’re not something I can use in a software renderer. Consequently, while a lot of the principles being discussed in those videos &amp; posts might apply to my project, the implementations do not.
+Here’s an example of what I mean. This video (you don’t have to watch it) talks about the principles and maths behind Lambertian illumination. That’s useful to me, that’s the type of illumination I use. But when he gets to the practical examples, he’s writing shader code and that’s not something I can use. Maybe if I understood how shaders work I could translate it, but I don’t so I can’t.</p>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/CxKZJbO3p50?si=GiAhY2A8bbtqk8z-&amp;start=158" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen=""></iframe>
+
+<p>Figuring out what kind of shading to implement was a task in and of itself. Information for my specific use-case is similarly hard to come by but I eventually found there are a few key names in the shading realm;</p>
+<ul>
+  <li>Lambertian Shading</li>
+  <li>Phong Shading</li>
+  <li>Gouraud Shading</li>
+</ul>
+
+<p>You’ve probably heard some of these names before. Phong, in particular, is one that I seem to recall from textbooks but I’ve never really understood what any of these things are. In my defence I’ve found that the same names are used to refer to different things and it’s easy to get confused. “Phong” can be a shading model, but also an interpolation method. “Lambert” can be a shading model too, but it can also be an illumination model. I’ll try to be as specific as I can to avoid contributing to this confusion. Here’s a quick rundown of the three. In the end I decided on using Phong shading.</p>
+
+<p><strong>Lambertian Shading</strong><br />
+As I understand it, Lambertian shading is used for flat shading. That would mean polygons do not appear curved at all with Lambertian shading. This page on <a href="https://www.scratchapixel.com/lessons/3d-basic-rendering/introduction-to-shading/diffuse-lambertian-shading.html">scratchapixel.com</a> gave me a decent rundown of how it works. Based on this, I decided I didn’t want to implement Lambertian shading but (<strong>and here’s the confusing bit</strong>) Lambertian illumination would be used if I were to implement Phong shading.</p>
+
+<p><strong>Phong Shading</strong><br />
+<a href="https://en.wikipedia.org/wiki/Phong_shading">Phong shading</a> has been around since the mid 70s so it sort of can’t be resource intensive by modern standards. It’s a time-tested method for shading and provides reasonably realistic results.</p>
+
+<p><strong>Gouraud Shading</strong><br />
+I’ve read varying things about <a href="https://en.wikipedia.org/wiki/Gouraud_shading">Gouraud shading</a>. <a href="https://en.wikipedia.org/wiki/Gouraud_shading#:~:text=Gouraud%20shading%20is%20considered%20superior%20to%20flat%20shading%20and%20requires%20significantly%20less%20processing%20than%20Phong%20shading%2C%20but%20usually%20results%20in%20a%20faceted%20look">Wikipedia says</a> it requires fewer resources than Phong shading and produces a more faceted look. I think I’ve also read that it produces a more realistic result but is more resource intensive. I heard the latter first, and it put me off using it.</p>
+
+<h1 id="implementing-phong-shading">Implementing Phong Shading</h1>
+<p><strong>Caveat</strong>: My implementation of Phong shading is so simplified that I’m not certain it still qualifies as Phong shading, but that’s what I’m going to call it.</p>
+
+<p>It’s surprisingly easy to implement a simplified form of Phong shading. The renderer draws triangles using a function called <code class="language-plaintext highlighter-rouge">rasterizeTriangle</code>. This function calculates the colour for each pixel in the triangle, so we’re going to update this function to take lighting data into account. We need to update <code class="language-plaintext highlighter-rouge">rasterizeTriangle</code> so it can;</p>
+<ul>
+  <li>Determine the normal vector of each pixel by interpolating between the normals of each vertex in the triangle
+    <ul>
+      <li>This can be done using barycentric coordinates, which are already calculated in <code class="language-plaintext highlighter-rouge">rasterizeTriangle</code> because they’re used to interpolate texture data</li>
+    </ul>
+  </li>
+  <li>Calculate a “diffuse factor”, i.e. how much each pixel in the triangle is affected by a diffuse light source</li>
+  <li>Multiply the colour of the pixel (determined by the texture) by the diffuse factor</li>
+</ul>
+
+<p><strong>Determining normal vector for each pixel</strong><br />
+This is easy enough because we only need 2 things;</p>
+<ul>
+  <li>The normal vector of each vertex in the triangle</li>
+  <li>The barycentric coordinates of the pixel we’re operating on</li>
+</ul>
+
+<p>As previously mentioned, barycentric coordinates are already available because we were using them to get texture data. The normal vector for the vertices is also available because it’s stored in the <code class="language-plaintext highlighter-rouge">.obj</code> file. We just need to read the data from the file and pass it into the <code class="language-plaintext highlighter-rouge">rasterizeTriangle</code> function. Glossing over all the plumbing of reading normal data from the file and passing it into the function, the new code looks something like this:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>const lightDirection = new THREE.Vector3(0, -10, -10).normalize();
+const lightColour = new THREE.Color(0, 0, 0); // White light
+
+const interpolatedNormal = new THREE.Vector3(
+    (u * normal0.x + v * normal1.x + w * normal2.x),
+    (u * normal0.y + v * normal1.y + w * normal2.y),
+    (u * normal0.z + v * normal1.z + w * normal2.z)
+);
+
+const diffuseFactor = Math.max(interpolatedNormal.dot(lightDirection), 0);
+
+const finalColour = {
+    r: lightColour.r + textureColour.r * diffuseFactor,
+    g: lightColour.g + textureColour.g * diffuseFactor,
+    b: lightColour.b + textureColour.b * diffuseFactor
+}
+</code></pre></div></div>
+
+<p><strong>On the simplicity of this shading model</strong><br />
+Specular highlighting is ignored here, which is why I hesitate to call this Phong shading. Phong shading would include specular highlights. There’s also some simplification in the illumination model because I’m only dealing with a single light source with a single intensity.</p>
+
+<h1 id="where-did-the-performance-improvement-come-from">Where did the performance improvement come from?</h1>
+<p>This post has been light on images but the one I did include showed a marked improvement in framerate. Unlike the previous blog post where I came clean about speeding up the animations, this time the animated gifs are actually slower than the real thing because the website I use to turn <code class="language-plaintext highlighter-rouge">.mp4</code> files into <code class="language-plaintext highlighter-rouge">.gifs</code> can only export at 30 FPS. Here’s an uncropped version where you can see the FPS counter just so you know I’m not lying.
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024-11-12_shaded_render_small.gif" alt="An animated gif of a 3D render of a spinning basketball" style="max-width: 100%; height: auto;" />
+</p>
+
+<p>So where did the performance improvements come from? There are 2 answers;</p>
+
+<p><strong>Chrome</strong><br />
+For whatever reason, the renderer runs roughly 10 FPS higher in Chrome than in Firefox. This is likely down to how the browsers optimise JavaScript under the hood.</p>
+
+<p><strong>Code improvements</strong><br />
+After last week’s optimisations I had my eyes open for further optimisation opportunities. Rather than include the code changes I’ll link to the Git commits, as I think Github provides a nicer UI for comparing old to new.</p>
+
+<ul>
+  <li><a href="https://github.com/Pipding/3dage_renderer/commit/5d44ddebf9ead4a7b0efc91eb0210bcdb8a57815">Instead of creating new arrays for vertices, uvs and normals inside the rendering loop, create one array for each outside the loop and save the values once</a></li>
+  <li><a href="https://github.com/Pipding/3dage_renderer/commit/5d44ddebf9ead4a7b0efc91eb0210bcdb8a57815">Precalculate transformed and projected vertices before rasterizing the triangle, and reference the values inside the rasterizeTriangle function instead of calculating them inside rasterizeTriangle</a></li>
+</ul>
+
+
+        <hr>
+
+        <div class="clearfix">
+
+          
+          <a class="btn btn-primary float-left" href="/3dage_renderer/2024/11/05/optimisation_round_one.html" data-toggle="tooltip" data-placement="top" title="A Boost in Performance">&larr; Previous<span class="d-none d-md-inline">
+              Post</span></a>
+          
+          
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Footer -->
+
+<hr>
+
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto">
+        <ul class="list-inline text-center">
+          
+          
+          
+          
+          
+          
+        </ul>
+        <p class="copyright text-muted">Copyright &copy;  2024</p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/3dage_renderer/assets/vendor/startbootstrap-clean-blog/js/scripts.js"></script>
+
+<script src="/3dage_renderer/assets/scripts.js"></script>
+
+
+
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id="></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', '');
+</script>
+
+
+
+</body>
+
+</html>
