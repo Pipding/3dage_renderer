@@ -11,8 +11,7 @@ const objLoader = new OBJLoader();
 let loadedObject = null;
 let loadedFileType = null;
 
-let loadedDiffuseMap = null;
-let rawImageData = null;
+let diffuseMap = null;
 
 let mesh = null;
 let geometry = null;
@@ -73,7 +72,7 @@ function loadImageData(url) {
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
         // Call the callback function with the image data
-        rawImageData = ({
+        diffuseMap = ({
             data: imageData.data, // Raw pixel data (Uint8ClampedArray)
             width: image.width,
             height: image.height
@@ -233,7 +232,7 @@ function renderWireframe() {
  * @returns 
  */
 function renderWithTexture(currentTime) {
-    if (!loadedObject || !rawImageData) return;
+    if (!loadedObject || !diffuseMap) return;
     if (!mesh) {
         loadedObject.traverse((child) => {
             if (child.isMesh) {
@@ -356,7 +355,7 @@ function rasterizeTriangle(v0, v1, v2, uv0, uv1, uv2, normal0, normal1, normal2)
                 );
 
                 // Sample the texture using the interpolated UV coordinates
-                const textureColour = sampleTexture(rawImageData, rawImageData.width, rawImageData.height, interpolatedUV);
+                const textureColour = sampleTexture(diffuseMap, diffuseMap.width, diffuseMap.height, interpolatedUV);
 
                 const interpolatedNormal = new THREE.Vector3(
                     (u * normal0.x + v * normal1.x + w * normal2.x),
