@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <link rel="icon" href="/3dage_renderer/assets/images/favicon.ico">
+
+  <title>
+    An Attempt at Normality - Coordinates to Canvas
+    
+  </title>
+
+  <meta name="description" content="In contrast to last week’s post, which was celebratory of the successful implementation of shading, this week’s post is basically the opposite. Following fro...">
+
+  <link href='https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+  <link href='https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+  <script src="https://use.fontawesome.com/releases/v5.15.3/js/all.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="/3dage_renderer/assets/main.css">
+  <link rel="canonical" href="https://pipding.github.io//3dage_renderer/2024/11/19/try_to_add_normal_maps.html">
+  <link rel="alternate" type="application/rss+xml" title="Coordinates to Canvas" href="/3dage_renderer/feed.xml">
+
+</head>
+
+
+<body>
+
+  <!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-light fixed-top" id="mainNav">
+  <div class="container">
+    <a class="navbar-brand" href="/3dage_renderer/">Coordinates to Canvas</a>
+    <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+      Menu
+      <i class="fa fa-bars"></i>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarResponsive">
+      <ul class="navbar-nav ml-auto">
+      </ul>
+    </div>
+  </div>
+</nav>
+
+
+  <!-- Page Header -->
+
+  <header class="masthead">
+    
+    <div class="overlay"></div>
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto">
+          <div class="post-heading">
+            <h1>An Attempt at Normality</h1>
+            
+            <h2 class="subheading">Trying to implement normal maps, week ending 2024-11-19</h2>
+            
+            <span class="meta">Posted by
+              <a href="#">Ryan</a>
+              on November 19, 2024 &middot; <span class="reading-time" title="Estimated read time">
+  
+   7 mins  read </span>
+
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto">
+
+        <p>In contrast to last week’s post, which was celebratory of the successful implementation of shading, this week’s post is basically the opposite. Following from the success of last week, I wanted to build on the shading by adding normal maps. While the implementation of shading went surprisingly smoothly (haha), normal mapping went, well…
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024-11-19_bad_normal_map.gif" alt="An animated gif of a rotating basketball with a very glitchy appearance." style="max-width: 100%; height: auto;" />
+</p>
+
+<h1 id="implementing-normal-maps">Implementing normal maps</h1>
+<p>Early in this project I’d assumed that implementing normal maps would be the most difficult part, but after the ease of implementing shading last week I started to think it might be easier than I expected. It wasn’t, I was right the first time. Normal maps are hard. And it’s all maths, who’d have guessed. It’s hard to summarise how normal maps work in a technical sense, especially when I don’t fully understand it myself, but I’ll give it a go;</p>
+
+<p>When we’re drawing a triangle on the screen, we’re doing so pixel-by-pixel. We can think of pixels in 2 ways. Obviously in reality it’s a 2-dimensional element on a screen, but it also represents a point in 3D space on the surface of whatever mesh we’re rendering. That 3D point ‘faces’ a certain direction in 3D space. That direction is called its normal vector, or just “normal” for short.</p>
+
+<p>When we use normal maps, we’re sort of offsetting that “normal” with data we pull from a normal map. Normal maps are just images where the pixel data aren’t being used to encode colour data, they’re being used to encode vectors. This means there’s information contained within each pixel of the normal map which corresponds to points on our mesh.</p>
+
+<p>The complexity of implementing normal mapping comes from the fact that we can’t simply take the vector data out of the normal map and apply it to the mesh in the same way we do with a diffuse map. We need to interpret the vector data - translating it into what’s called “world space”. This is because the data is relative to the surface of each polygon, and each polygon has its own orientation in “world space” so we need to account for that.</p>
+
+<p>In order to translate a pixel’s normal map data into world space, we need to construct a matrix using 3 vectors;</p>
+<ul>
+  <li>The normal vector</li>
+  <li>The tangent vector</li>
+  <li>The bitangent vector</li>
+</ul>
+
+<p>We construct a matrix from these 3 and use it to apply a transformation to the data from the normal maps and voila. What the hell are tangent and bitangent vectors, you ask? Well, have you ever seen that image of how cartesian spaces can be defined using three fingers; index, middle and thumb? Something like this one I found on <a href="https://stackoverflow.com/a/34068511">StackOverflow</a>:
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024-11-19_right_hand_rule.png" alt="An illustration of a hand with the index finger, middle finger and thumb extended, all in orthogonal directions." style="max-width: 100%; height: auto;" />
+</p>
+
+<p>That 3-finger array is basically a normal, tangent and bitangent vector. The index finger is the normal vector, the middle finger (the tangent vector) is perpendicular with it (and parallel to the plane defined by the normal) and the thumb (the bitangent) is orthogonal (perpendicular) to both. The twist is that the tangent needs to be pointing in the direction of increasing U coordinates and the bitangent, I think, should be in the direction of increasing V.
+I understand what I just said right now, but give it a month and I’ll be as confused as you probably are.</p>
+
+<p>If all of that went completely over your head, don’t worry. It’s a lot to take in and I obviously haven’t totally internalised it, hence the state of my render. Let’s see that again.
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024-11-19_bad_normal_map.gif" alt="An animated gif of a rotating basketball with a very glitchy appearance." style="max-width: 100%; height: auto;" />
+</p>
+<p>Oof.</p>
+
+<h1 id="what-went-wrong">What went wrong?</h1>
+<p>I obviously haven’t implemented normal mapping correctly or else it’d look good, but to be honest I don’t know what’s wrong with it. It could be something related to how I’m calculating tangent and bitangent vectors, it might be the fact that I only half-implemented Phong shading last week. Basically I need more time to stew on the problem to figure out what’s wrong but unfortunately time is something I’m running out of. With only a few weeks left and several other deadlines approaching, I think I’ll need to park normal mapping here and leave it incomplete.</p>
+
+<h1 id="where-to-go-from-here">Where to go from here?</h1>
+<p>I stated a while ago that if it came down to the line and I had to cut a feature from this project, I’d cut user interactivity before I cut normal maps. I think I’m going to renege on that. I think at this stage I’d need a lot more time to get normal mapping working than I’d need to implement user controls to rotate and zoom in the model. I’d still like to understand normal mapping some day, so I hope I’ll come back to it eventually, probably using another programming language.</p>
+
+<h1 id="resources">Resources</h1>
+<p>Normally I like to intersperse my blog posts with links to the resources I’ve used but that’s contingent on my being able to weave them into a coherent story. In this case I haven’t been able to fully implement normal mapping so I haven’t done that. Instead I’m going to dump a list of useful resources at the end, both for the reader and my future self. Hopefully when (if) I revisit normal mapping, these will prove useful.</p>
+<ul>
+  <li><a href="https://gamedev.stackexchange.com/a/51402">StackOverflow answer explaining normal, tangent and bitangent vectors</a></li>
+  <li><a href="https://terathon.com/blog/tangent-space.html">A blog post explaining how to compute tangent space basis vectors</a></li>
+  <li><a href="https://stackoverflow.com/a/5257471">Another StackOverflow answer explaining how to calculate TBN matrices</a></li>
+  <li><a href="https://www.reddit.com/r/blenderhelp/comments/y2001x/when_i_put_a_normal_map_on_my_mesh_i_get_these/?rdt=40154">Reddit post where someone was seeing similar clearly-defined polygons when using a normal map in Blender as I saw in my renderer</a></li>
+</ul>
+
+
+        <hr>
+
+        <div class="clearfix">
+
+          
+          <a class="btn btn-primary float-left" href="/3dage_renderer/2024/11/12/add_shading.html" data-toggle="tooltip" data-placement="top" title="Shady Business">&larr; Previous<span class="d-none d-md-inline">
+              Post</span></a>
+          
+          
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Footer -->
+
+<hr>
+
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto">
+        <ul class="list-inline text-center">
+          
+          
+          
+          
+          
+          
+        </ul>
+        <p class="copyright text-muted">Copyright &copy;  2024</p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/3dage_renderer/assets/vendor/startbootstrap-clean-blog/js/scripts.js"></script>
+
+<script src="/3dage_renderer/assets/scripts.js"></script>
+
+
+
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id="></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', '');
+</script>
+
+
+
+</body>
+
+</html>
