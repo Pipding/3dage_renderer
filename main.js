@@ -1,19 +1,11 @@
 import * as THREE from 'three';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 
-const FileType = {
-    OBJ: 'obj',
-    GLTF: 'gltf'
-};
-
 const objLoader = new OBJLoader();
 
 let loadedObject = null;
-let loadedFileType = null;
 
-let loadedDiffuseMap = null;
-let rawImageData = null;
-
+let diffuseMap = null;
 let mesh = null;
 let geometry = null;
 let vertices = null;
@@ -28,10 +20,12 @@ let frameBufferEmpty = new Uint8ClampedArray();
 
 var rotationMatrix = new THREE.Matrix4();
 
+// Variables for measuring framerate
 let lastTime = 0;
 let frameCount = 0;
 let fps = 0;
 
+// Keeps track of the number of frames which have passed each second
 function updateFrameRate(currentTime) {
     frameCount++;
     if (currentTime - lastTime >= 1000) {
@@ -41,6 +35,7 @@ function updateFrameRate(currentTime) {
     }
 }
 
+// Draws framerate and resolution information on teh screen
 function drawInfo() {
     const text = `Canvas: ${canvas.width}x${canvas.height}, FPS: ${fps}`;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Semi-transparent background
@@ -53,7 +48,8 @@ function drawInfo() {
     ctx.fillText(text, canvas.width - 10, 15); // Position of the text
 }
 
-function loadImageData(url) {
+// Loads a diffuse map
+function loadDiffuseMap(url) {
     const image = new Image();
     image.src = url;
 
@@ -73,7 +69,7 @@ function loadImageData(url) {
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
         // Call the callback function with the image data
-        rawImageData = ({
+        diffuseMap = ({
             data: imageData.data, // Raw pixel data (Uint8ClampedArray)
             width: image.width,
             height: image.height
@@ -82,29 +78,19 @@ function loadImageData(url) {
 }
 
 function loadObj(filePath, callback) {
-    // Source: https://threejs.org/docs/#examples/en/loaders/OBJLoader
+    // Note: THREE.js always lods OBJ files as non-indexed. If you want indexed verts, you
+    // need to call BufferGeometryUtils.mergeVertices: https://threejs.org/docs/index.html#examples/en/utils/BufferGeometryUtils.mergeVertices
+
+    // Source for the loading code: https://threejs.org/docs/#examples/en/loaders/OBJLoader
     objLoader.load(filePath,
         // called when resource is loaded
         function ( object ) {
             loadedObject = object;
-
-            if (loadedObject instanceof THREE.Group) {
-                console.log("Loaded object is a Group");
-            } else if (loadedObject instanceof THREE.Mesh) {
-                console.log("Loaded object is a Mesh");
-            } else if (loadedObject instanceof THREE.Object3D) {
-                console.log("Loaded object is a generic Object3D");
-            }
-
-            // Note: THREE.js always lods OBJ files as non-indexed. If you want indexed verts, you
-            // need to call BufferGeometryUtils.mergeVertices: https://threejs.org/docs/index.html#examples/en/utils/BufferGeometryUtils.mergeVertices
-            loadedFileType = FileType.OBJ;
-
             callback()
         },
         // called when loading is in progress
         function ( xhr ) {
-            console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+            console.log('OBJ file ' + ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
         },
         // called when loading has errors
         function ( error ) {
@@ -168,7 +154,7 @@ function projectVertex(vertex) {
 }
 
 function drawTriangle(ctx, v0, v1, v2) {
-    ctx.strokeStyle = 'black';
+    ctx.strokeStyle = 'white';
     ctx.beginPath();
     ctx.moveTo(v0.x, v0.y);
     ctx.lineTo(v1.x, v1.y);
@@ -178,50 +164,58 @@ function drawTriangle(ctx, v0, v1, v2) {
 }
 
 // Function to render the wireframe
-function renderWireframe() {
+function renderWireframe(currentTime) {
     if (!loadedObject) return;
+    if (!mesh) {
+        loadedObject.traverse((child) => {
+            if (child.isMesh) {
+                mesh = child;
+                geometry = mesh.geometry;
+                vertices = geometry.attributes.position.array;
+                uvs = geometry.attributes.uv.array; // UV coordinates
+                normals = geometry.attributes.normal.array; // Vertex normals
+            }
+        });
+    }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    // Traverse the geometry of the loaded object
-    // The object is expected to load in as a THREE.Group (https://threejs.org/docs/#api/en/objects/Group)
-    // THREE.Group is a subclass of THREE.Object3D (https://threejs.org/docs/index.html#api/en/core/Object3D)
-    // so we can call .traverse() on it to iterate through its elements
-    loadedObject.traverse((child) => {
-        if (child.isMesh) {
-            const geometry = child.geometry;
-            // console.log(geometry) // Debug
-            child.rotation.x += 0.05;
-            child.rotation.y += 0.02;
-            const vertices = geometry.attributes.position.array;
+    updateFrameRate(currentTime);
 
-            // Before projecting the vertices into 2D space we need to apply rotation. To do this, use THREE.Object3D::applyMatrix4
-            // https://threejs.org/docs/#api/en/core/Object3D.applyMatrix4
+    if (mesh.rotationNeedsUpdate) {
+        rotationMatrix.makeRotationFromEuler(mesh.rotation);
+        mesh.rotationNeedsUpdate = false;
+    }
 
-            var rotationMatrix = new THREE.Matrix4();
+    mesh.rotation.x += 0.05;
+    mesh.rotation.y += 0.02;
+    mesh.rotationNeedsUpdate = true;
 
-            rotationMatrix.makeRotationFromEuler(child.rotation);
+    // Transform and project all vertices
+    const transformedVertices = [];
+    const transformedNormals = [];
+    const projectedVertices = [];
+    let tempV0 = new THREE.Vector3;
+    for (let i = 0; i < vertices.length; i += 3) {
+        tempV0.set(vertices[i], vertices[i + 1], vertices[i + 2]).applyMatrix4(rotationMatrix);
+        transformedVertices[i / 3] = tempV0.clone();
+        projectedVertices[i / 3] = projectVertex(tempV0);
+        tempV0.set(normals[i], normals[i + 1], normals[i + 2]).applyMatrix4(rotationMatrix);
+        transformedNormals[i / 3] = tempV0.clone();
+    }
 
-            // Loop through the vertices
-            for (let i = 0; i < vertices.length; i += 9) { // 9 because there are 3 vertices per triangle, each with 3 components (x, y, z)
-                let v0 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
-                let v1 = new THREE.Vector3(vertices[i + 3], vertices[i + 4], vertices[i + 5]);
-                let v2 = new THREE.Vector3(vertices[i + 6], vertices[i + 7], vertices[i + 8]);
+    // Loop through the vertices
+    for (let i = 0; i < vertices.length; i += 9) { // 9 because there are 3 vertices per triangle, each with 3 components (x, y, z)
+        let v0 = projectedVertices[(i/3)];
+        let v1 = projectedVertices[(i/3) + 1];
+        let v2 = projectedVertices[(i/3) + 2];
 
-                v0.applyMatrix4(rotationMatrix);
-                v1.applyMatrix4(rotationMatrix);
-                v2.applyMatrix4(rotationMatrix);
+        drawTriangle(ctx, v0, v1, v2);
+    }
 
-                v0 = projectVertex(v0);
-                v1 = projectVertex(v1);
-                v2 = projectVertex(v2);
-
-                drawTriangle(ctx, v0, v1, v2)
-            }
-        }
-    });
+    drawInfo();
 
     // Continue the animation loop
     requestAnimationFrame(renderWireframe);
@@ -233,7 +227,7 @@ function renderWireframe() {
  * @returns 
  */
 function renderWithTexture(currentTime) {
-    if (!loadedObject || !rawImageData) return;
+    if (!loadedObject || !diffuseMap) return;
     if (!mesh) {
         loadedObject.traverse((child) => {
             if (child.isMesh) {
@@ -356,7 +350,7 @@ function rasterizeTriangle(v0, v1, v2, uv0, uv1, uv2, normal0, normal1, normal2)
                 );
 
                 // Sample the texture using the interpolated UV coordinates
-                const textureColour = sampleTexture(rawImageData, rawImageData.width, rawImageData.height, interpolatedUV);
+                const textureColour = sampleTexture(diffuseMap, diffuseMap.width, diffuseMap.height, interpolatedUV);
 
                 const interpolatedNormal = new THREE.Vector3(
                     (u * normal0.x + v * normal1.x + w * normal2.x),
@@ -445,8 +439,8 @@ function sampleTexture(textureData, texWidth, texHeight, uv) {
     return { r, g, b, a };
 }
 
-loadImageData("models/basketball_d.png")
+loadDiffuseMap("models/basketball_d.png")
 // loadImageData("models/uv_checker.jpg")
 
-// loadObj("models/basketball_triangulated.obj", renderWireframe);
-loadObj("models/basketball_triangulated.obj", renderWithTexture);
+loadObj("models/basketball_triangulated.obj", renderWireframe);
+// loadObj("models/basketball_triangulated.obj", renderWithTexture);
