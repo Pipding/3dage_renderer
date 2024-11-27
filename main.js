@@ -19,6 +19,8 @@ let geometry = null;
 let vertices = null;
 let uvs = null; // UV coordinates
 let normals = null; // Vertex normals
+let tangents = null; // Vertex tangents
+let bitangents = null; // Vertex bitangents
 
 let depthBuffer = new Float32Array();
 let depthBufferEmpty = new Float32Array();
@@ -167,13 +169,13 @@ canvas.height = window.innerHeight;
 
 // Set up a camera
 const camera = {
-    position: { x: 0, y: 0, z: -10 },
+    position: { x: 0, y: 0, z: -3 },
     fov: 45
 };
 
 // Set up a light
 const lightDirection = new THREE.Vector3(0, -10, -10).normalize();
-const lightColour = new THREE.Color(0, 0, 0);
+const lightColour = new THREE.Color(1, 1, 1);
 
 // Function to project 3D vertex into 2D space
 function projectVertex(vertex) {
@@ -255,6 +257,55 @@ function renderWireframe() {
     requestAnimationFrame(renderWireframe);
 }
 
+function calculateTangents(vertices, uvs) {
+    tangents = new Array(vertices.length).fill(0).map(() => new THREE.Vector3());
+    bitangents = new Array(vertices.length).fill(0).map(() => new THREE.Vector3());
+
+    for (let i = 0; i < vertices.length; i += 9) {
+        // Triangle vertices
+        const v0 = new THREE.Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
+        const v1 = new THREE.Vector3(vertices[i + 3], vertices[i + 4], vertices[i + 5]);
+        const v2 = new THREE.Vector3(vertices[i + 6], vertices[i + 7], vertices[i + 8]);
+
+        // UVs
+        const uv0 = new THREE.Vector2(uvs[(i / 3) * 2], uvs[(i / 3) * 2 + 1]);
+        const uv1 = new THREE.Vector2(uvs[(i / 3 + 1) * 2], uvs[(i / 3 + 1) * 2 + 1]);
+        const uv2 = new THREE.Vector2(uvs[(i / 3 + 2) * 2], uvs[(i / 3 + 2) * 2 + 1]);
+
+        // Edges in world space
+        const edge1 = v1.clone().sub(v0);
+        const edge2 = v2.clone().sub(v0);
+
+        // Edges in UV space
+        const deltaUV1 = uv1.clone().sub(uv0);
+        const deltaUV2 = uv2.clone().sub(uv0);
+
+        const f = 1.0 / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        // Tangent and bitangent
+        const tangent = new THREE.Vector3(
+            f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x),
+            f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y),
+            f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z)
+        ).normalize();
+
+        const bitangent = new THREE.Vector3(
+            f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x),
+            f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y),
+            f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z)
+        ).normalize();
+
+        // Add tangent and bitangent to each vertex of the triangle
+        tangents[i / 3] = tangent.clone();
+        tangents[i / 3 + 1] = tangent.clone();
+        tangents[i / 3 + 2] = tangent.clone();
+
+        bitangents[i / 3] = bitangent.clone();
+        bitangents[i / 3 + 1] = bitangent.clone();
+        bitangents[i / 3 + 2] = bitangent.clone();
+    }
+}
+
 /**
  * Renders the loaded mesh with the loaded texture applied
  * @param currentTime Timestamp provided by requestAnimationFrame use to calculate elapsed time between frames
@@ -270,6 +321,8 @@ function renderWithTexture(currentTime) {
                 vertices = geometry.attributes.position.array;
                 uvs = geometry.attributes.uv.array; // UV coordinates
                 normals = geometry.attributes.normal.array; // Vertex normals
+
+                calculateTangents(vertices, uvs)
             }
         });
     }
@@ -333,7 +386,9 @@ function renderWithTexture(currentTime) {
         rasterizeTriangle(
             projectedVertices[i/3], projectedVertices[(i/3) + 1], projectedVertices[(i/3) + 2], // Vertices
             uv0, uv1, uv2, // UVs
-            transformedNormals[i/3], transformedNormals[(i/3) + 1], transformedNormals[(i/3) + 2]// Normals
+            transformedNormals[i/3], transformedNormals[(i/3) + 1], transformedNormals[(i/3) + 2], // Normals
+            tangents[i / 3], tangents[(i / 3) + 1], tangents[(i / 3) + 2], // Tangents
+            bitangents[i / 3], bitangents[(i / 3) + 1], bitangents[(i / 3) + 2] // Bitangents
         );
         // drawTriangle(ctx, projectedVertices[i/3], projectedVertices[(i/3) + 1], projectedVertices[(i/3) + 2]) // Enable this to draw wireframe
     }
@@ -346,7 +401,7 @@ function renderWithTexture(currentTime) {
     requestAnimationFrame(renderWithTexture);
 }
 
-function rasterizeTriangle(v0, v1, v2, uv0, uv1, uv2, normal0, normal1, normal2) {
+function rasterizeTriangle(v0, v1, v2, uv0, uv1, uv2, normal0, normal1, normal2, tangent0, tangent1, tangent2, bitangent0, bitangent1, bitangent2) {
     // Calculate the bounding box of the triangle
     // The mins and maxes are floored and ceilinged because they're used array indices
     const minX = Math.floor(Math.min(v0.x, v1.x, v2.x));
@@ -383,22 +438,55 @@ function rasterizeTriangle(v0, v1, v2, uv0, uv1, uv2, normal0, normal1, normal2)
                     1 - (u * uv0.y + v * uv1.y + w * uv2.y) // No, this is inverted...
                 );
 
-                // Sample the texture using the interpolated UV coordinates
-                const textureColour = sampleTexture(diffuseMap, diffuseMap.width, diffuseMap.height, interpolatedUV);
-                const normalColour = sampleTexture(normalMap, normalMap.width, normalMap.height, interpolatedUV);
-
                 const interpolatedNormal = new THREE.Vector3(
                     (u * normal0.x + v * normal1.x + w * normal2.x),
                     (u * normal0.y + v * normal1.y + w * normal2.y),
                     (u * normal0.z + v * normal1.z + w * normal2.z)
                 );
 
+                // Sample the texture using the interpolated UV coordinates
+                const textureColour = sampleTexture(diffuseMap, diffuseMap.width, diffuseMap.height, interpolatedUV);
+                // const textureColour = sampleTexture(normalMap, normalMap.width, normalMap.height, interpolatedUV);
+                // const normalColour = sampleTexture(diffuseMap, diffuseMap.width, diffuseMap.height, interpolatedUV);
+                const normalColour = sampleTexture(normalMap, normalMap.width, normalMap.height, interpolatedUV);
+
+                // Interpolating tangent and bitangent
+                const interpolatedTangent = new THREE.Vector3(
+                    u * tangent0.x + v * tangent1.x + w * tangent2.x,
+                    u * tangent0.y + v * tangent1.y + w * tangent2.y,
+                    u * tangent0.z + v * tangent1.z + w * tangent2.z
+                ).normalize();
+
+                const interpolatedBitangent = new THREE.Vector3(
+                    u * bitangent0.x + v * bitangent1.x + w * bitangent2.x,
+                    u * bitangent0.y + v * bitangent1.y + w * bitangent2.y,
+                    u * bitangent0.z + v * bitangent1.z + w * bitangent2.z
+                ).normalize();
+
+                // Tangent space to world space matrix
+                const TBN = new THREE.Matrix3();
+                TBN.set(
+                    interpolatedTangent.x, interpolatedBitangent.x, interpolatedNormal.x,
+                    interpolatedTangent.y, interpolatedBitangent.y, interpolatedNormal.y,
+                    interpolatedTangent.z, interpolatedBitangent.z, interpolatedNormal.z
+                );
+
+                // Transform sampled normal
+                const tangentSpaceNormal = new THREE.Vector3(
+                    (normalColour.r - 0.5) * 2.0, // Map from [0, 1] to [-1, 1]
+                    (normalColour.g - 0.5) * 2.0,
+                    (normalColour.b - 0.5) * 2.0
+                );
+
+                const worldSpaceNormal = tangentSpaceNormal.applyMatrix3(TBN).normalize();
+
                 // Here we compute the diffuse factor, i.e. how much light this pixel reflects. This is a simplified version 
                 // of the formula found here: https://www.scratchapixel.com/lessons/3d-basic-rendering/introduction-to-shading/diffuse-lambertian-shading.html
                 // that being "Diffuse Surface Color = Incident Light Energy . N . L."
                 // In this simplification we're ignoring light intensity because the light has uniform intensity. This leaves just N (the interpolated surface normal)
                 // and L (the normalized light direction)
-                const diffuse = Math.max(interpolatedNormal.dot(lightDirection), 0);
+                // const diffuse = Math.max(interpolatedNormal.dot(lightDirection), 0);
+                const diffuse = Math.max(worldSpaceNormal.dot(lightDirection), 0);
 
                 // We're basically only implementing the Lambertian illumination model, not Phong shading, because we ignore the specular element.
                 // We are assuming ambient is a constant though, so it's like 2/3 Phong? https://stackoverflow.com/a/15802920
@@ -476,6 +564,7 @@ function sampleTexture(textureData, texWidth, texHeight, uv) {
 
 loadDiffuseMap("models/basketball_d.png")
 loadNormalMap("models/basketball_n.png")
+// loadNormalMap("models/uv_checker.jpg")
 // loadImageData("models/uv_checker.jpg")
 
 // loadObj("models/basketball_triangulated.obj", renderWireframe);
