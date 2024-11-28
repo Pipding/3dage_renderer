@@ -34,6 +34,7 @@ let mouseDown = false;
 let modelRotationSpeed = new THREE.Vector2;
 let inputLastTime = 0; // Used to calculate deltaTime for user inputs
 let wireframeMode = true;
+let uvCheckerMode = false;
 
 
 // Keeps track of the number of frames which have passed each second
@@ -118,8 +119,9 @@ function drawInfo() {
 
 function drawControls() {
     const rotationControlText = `Rotate model: Arrow keys or WASD`;
-    const zoomControlText = `Zoom: Mouse click`;
+    const zoomControlText = `Zoom: Mouse Click`;
     const wireframeControlText = `Toggle wireframe: Q`;
+    const uvCheckerControlText = `Toggle UV checker material: E`;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Semi-transparent background
     ctx.fillRect(canvas.width - 300, canvas.height - 60, 500, 60); // Background rectangle for the text
 
@@ -127,7 +129,8 @@ function drawControls() {
     ctx.font = '16px Arial';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
-    ctx.fillText(wireframeControlText, canvas.width - 30, canvas.height - 90); // Position of the text
+    ctx.fillText(wireframeControlText, canvas.width - 30, canvas.height - 120); // Position of the text
+    ctx.fillText(uvCheckerControlText, canvas.width - 30, canvas.height - 90); // Position of the text
     ctx.fillText(zoomControlText, canvas.width - 30, canvas.height - 60); // Position of the text
     ctx.fillText(rotationControlText, canvas.width - 30, canvas.height - 30); // Position of the text
 }
@@ -605,6 +608,14 @@ document.addEventListener("keyup", function onEvent(event) {
 document.addEventListener("keypress", function onEvent(event) {
     if (event.key === "q") {
         wireframeMode = !wireframeMode;
+    } else if (event.key === "e") {
+        uvCheckerMode = !uvCheckerMode;
+
+        if (uvCheckerMode) {
+            loadDiffuseMap("models/uv_checker.jpg")
+        } else {
+            loadDiffuseMap("models/basketball_d.png")
+        }
     }
 });
 
@@ -617,6 +628,4 @@ document.addEventListener("mouseup", function onEvent(event) {
 });
 
 loadDiffuseMap("models/basketball_d.png")
-// loadDiffuseMap("models/uv_checker.jpg")
-
 loadObj("models/basketball_triangulated.obj", render);
