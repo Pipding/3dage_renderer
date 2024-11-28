@@ -119,6 +119,20 @@ function drawInfo() {
     ctx.fillText(text, canvas.width - 10, 15); // Position of the text
 }
 
+function drawControls() {
+    const rotationControlText = `Rotate model: Arrow keys or WASD`;
+    const zoomControlText = `Zoom: Mouse click`;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Semi-transparent background
+    ctx.fillRect(canvas.width - 300, canvas.height - 60, 500, 60); // Background rectangle for the text
+
+    ctx.fillStyle = 'white';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText(rotationControlText, canvas.width - 30, canvas.height - 60); // Position of the text
+    ctx.fillText(zoomControlText, canvas.width - 30, canvas.height - 30); // Position of the text
+}
+
 // Loads a diffuse map
 function loadDiffuseMap(url) {
     const image = new Image();
@@ -290,6 +304,7 @@ function renderWireframe(currentTime) {
     }
 
     drawInfo();
+    drawControls();
 
     // Continue the animation loop
     requestAnimationFrame(renderWireframe);
@@ -376,6 +391,7 @@ function renderWithTexture(currentTime) {
     renderFrameBuffer(ctx)
 
     drawInfo();
+    drawControls();
 
     // Continue the animation loop
     requestAnimationFrame(renderWithTexture);
@@ -541,39 +557,32 @@ function doRotateWorldSpace(rotateX, rotateY, rotateZ) {
     mesh.rotationNeedsUpdate = true;
 }
 
-
-loadDiffuseMap("models/basketball_d.png")
-// loadImageData("models/uv_checker.jpg")
-
-// loadObj("models/basketball_triangulated.obj", renderWireframe);
-loadObj("models/basketball_triangulated.obj", renderWithTexture);
-
 document.addEventListener("keydown", function onEvent(event) {
-    if (event.key === "ArrowLeft") {
+    if (event.key === "ArrowLeft" || event.key == "a") {
         leftKeyDown = true;
     }
-    else if (event.key === "ArrowRight") {
+    else if (event.key === "ArrowRight"  || event.key == "d") {
         rightKeyDown = true;
     }
-    else if (event.key === "ArrowDown") {
+    else if (event.key === "ArrowDown" || event.key == "s") {
         downKeyDown = true;
     }
-    else if (event.key === "ArrowUp") {
+    else if (event.key === "ArrowUp" || event.key == "w") {
         upKeyDown = true;
     }
 });
 
 document.addEventListener("keyup", function onEvent(event) {
-    if (event.key === "ArrowLeft") {
+    if (event.key === "ArrowLeft" || event.key == "a") {
         leftKeyDown = false;
     }
-    else if (event.key === "ArrowRight") {
+    else if (event.key === "ArrowRight" || event.key == "d") {
         rightKeyDown = false;
     }
-    else if (event.key === "ArrowDown") {
+    else if (event.key === "ArrowDown" || event.key == "s") {
         downKeyDown = false;
     }
-    else if (event.key === "ArrowUp") {
+    else if (event.key === "ArrowUp" || event.key == "w") {
         upKeyDown = false;
     }
 });
@@ -585,3 +594,9 @@ document.addEventListener("mousedown", function onEvent(event) {
 document.addEventListener("mouseup", function onEvent(event) {
     mouseDown = false;
 });
+
+loadDiffuseMap("models/basketball_d.png")
+// loadImageData("models/uv_checker.jpg")
+
+loadObj("models/basketball_triangulated.obj", renderWireframe);
+// loadObj("models/basketball_triangulated.obj", renderWithTexture);
