@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <link rel="icon" href="/3dage_renderer/assets/images/favicon.ico">
+
+  <title>
+    Adding a Semblance of Control - Coordinates to Canvas
+    
+  </title>
+
+  <meta name="description" content="Click here to see the renderer!">
+
+  <link href='https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+  <link href='https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+  <script src="https://use.fontawesome.com/releases/v5.15.3/js/all.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="/3dage_renderer/assets/main.css">
+  <link rel="canonical" href="https://pipding.github.io//3dage_renderer/2024/11/26/adding_user_controls.html">
+  <link rel="alternate" type="application/rss+xml" title="Coordinates to Canvas" href="/3dage_renderer/feed.xml">
+
+</head>
+
+
+<body>
+
+  <!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-light fixed-top" id="mainNav">
+  <div class="container">
+    <a class="navbar-brand" href="/3dage_renderer/">Coordinates to Canvas</a>
+    <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+      Menu
+      <i class="fa fa-bars"></i>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarResponsive">
+      <ul class="navbar-nav ml-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="/3dage_renderer/renderer">Renderer</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+
+  <!-- Page Header -->
+
+<header class="masthead" style="background-image: url('/3dage_renderer/assets/images/2024-11-26_model_showcase.gif')">
+  
+    <div class="overlay"></div>
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto">
+          <div class="post-heading">
+            <h1>Adding a Semblance of Control</h1>
+            
+            <h2 class="subheading">Making the renderer presentable ahead of presentations, week ending 2024-11-26</h2>
+            
+            <span class="meta">Posted by
+              <a href="#">Ryan</a>
+              on November 26, 2024 &middot; <span class="reading-time" title="Estimated read time">
+  
+   7 mins  read </span>
+
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto">
+
+        <h1 id="click-here-to-see-the-renderer"><a href="https://pipding.github.io/3dage_renderer/renderer/">Click here to see the renderer!</a></h1>
+
+<p>The end is approaching and, having given up on my hopes of implementing normal mapping (<a href="https://pipding.github.io/3dage_renderer/2024/11/19/try_to_add_normal_maps.html">as explained last week</a>) I’m focusing on getting the renderer into a presentable state ahead of the symposium. Here’s what I set out to accomplish;</p>
+<ul>
+  <li>The user should be able to control the rotation of the model and zoom in</li>
+  <li>The user should be able to toggle between wireframe and textured views</li>
+  <li>There should be multiple meshes for the user to choose from</li>
+  <li>The renderer should be hosted online so people can access it easily</li>
+</ul>
+
+<h1 id="adding-user-controls">Adding user controls</h1>
+<p>The simplest way to add user controls for rotating and zooming in is to map keypresses to actions. Something like this:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>document.addEventListener("keydown", function onEvent(event) {
+    if (event.key === "ArrowLeft") {
+        mesh.rotation += 0.05;
+    }
+});
+</code></pre></div></div>
+
+<p>I don’t like this approach because it’s binary, meaning that as soon as you press a button the object is rotating at max speed. I like motion to be smooth, so I’m using a more complicated setup. Instead of mapping user input directly to actions, I have a set of variables with names like <code class="language-plaintext highlighter-rouge">upKeyDown</code>, <code class="language-plaintext highlighter-rouge">leftKeyDown</code>, etc. This allows me to control the movement of the object in a tick function, which in turn allows me to gradually increase its speed. I make the deceleration work similarly, decaying speed on a per-frame basis instead of just stopping abruptly. The result is a smooth acceleration/deceleration.
+<br /></p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024-11-26_rotation_acceleration.gif" alt="An animated gif showing a basketball rotating with gradual acceleration and deceleration" style="max-width: 100%; height: auto;" />
+</p>
+
+<p>The same principle is applied to the zoom in &amp; zoom out, the only significant difference being that we’re adjusting the camera’s z coordinate instead of the rotation of the mesh.</p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024-11-26_zoom_acceleration.gif" alt="An animated gif showing a rendered basketball. The camera smoothly zooms in and out" style="max-width: 100%; height: auto;" />
+</p>
+<p><br /></p>
+
+<h1 id="multiple-view-modes">Multiple view modes</h1>
+<p>Adding multiple view modes was mostly a case of reviving some old code. I’d had separate <code class="language-plaintext highlighter-rouge">renderWireframe</code> and <code class="language-plaintext highlighter-rouge">renderWithTexture</code> functions for weeks. <code class="language-plaintext highlighter-rouge">renderWireframe</code> came first but it broke at some point after I introduced <code class="language-plaintext highlighter-rouge">renderWithTexture</code>. After fixing it up I added a manager function called <code class="language-plaintext highlighter-rouge">render</code> and a boolean for controlling which view to use. It looks something like this:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>function render(currentTime) {
+    if (wireframeMode) {
+        renderWireframe(currentTime);
+    } else {
+        renderWithTexture(currentTime);
+    }
+}
+</code></pre></div></div>
+
+<p>Then I simply add a key press event to toggle <code class="language-plaintext highlighter-rouge">wireframeMode</code> on and off.</p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024-11-26_wireframe_toggle.gif" alt="An animated gif showing a rendered basketball toggle between wireframe and textured views" style="max-width: 100%; height: auto;" />
+</p>
+
+<p>The UV check mode is also fairly simple to implement. I created a boolean called <code class="language-plaintext highlighter-rouge">uvCheckerMode</code> which can be toggled by the user. Whenever the value of that bool changes, we just load in a different diffuse map.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>if (event.key === "e") {
+  uvCheckerMode = !uvCheckerMode;
+
+  if (uvCheckerMode) {
+      loadDiffuseMap("models/uv_checker.jpg")
+  } else {
+      loadDiffuseMap("models/basketball_d.png");
+  }
+}
+</code></pre></div></div>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024-11-26_uv_checker_toggle.gif" alt="An animated gif showing a rendered basketball with its material switching between a debug texture and a normal one" style="max-width: 100%; height: auto;" />
+</p>
+
+<h1 id="adding-more-meshes">Adding more meshes</h1>
+<p>My renderer can only render triangulated meshes. This means I’d need a few low-poly triangulated meshes I could add to demo the renderer. Fortunately we worked with a C++ library called <a href="https://www.raylib.com/">raylib</a> in our first semester which had the same limitation. That means I was able to re-use the meshes I’d used for a project last year in this renderer. The models I chose to include are;</p>
+<ul>
+  <li>basketball.obj (self-made)</li>
+  <li>ducky.obj (<a href="https://www.cgtrader.com/free-3d-models/sports/toy/rubber-duck-b31f3585-0347-4532-bd92-7ddea6107d0d">CGTrader</a>)</li>
+  <li>health.obj (self-made)</li>
+  <li>missile.obj (self-made)</li>
+  <li>powerup.obj (self-made)</li>
+  <li>ufo.obj (<a href="https://www.turbosquid.com/3d-models/free-3ds-model-flying-saucer/1081073">TurboSquid</a>)</li>
+</ul>
+
+<p>Throughout development I’ve only been using a single mesh and texture so I had to add some code to swap between assets. To do this I stored information about the assets in a dictionary like this:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>const modelLibrary = {
+    basketball: {
+        name: "Basketball",
+        obj: "models/basketball.obj",
+        diffuse: "models/basketball_d.png"
+    },
+    ducky: {
+        name: "Ducky",
+        obj: "models/ducky.obj",
+        diffuse: "models/ducky_d.png"
+    },
+    ...
+}
+</code></pre></div></div>
+
+<p>Then I create a list from that dictionary which I can iterate through.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>const modelList = Object.values(modelLibrary);
+</code></pre></div></div>
+
+<p>And then whenever the user presses spacebar I iterate through the list and load the new assets.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>if (event.key === "spacebar") {
+    modelIndex = (modelIndex + 1) % modelList.length;
+    loadedObject = null;
+    mesh = null;
+
+    loadDiffuseMap(modelList[modelIndex].diffuse);
+    loadObj(modelList[modelIndex].obj, render);
+}
+</code></pre></div></div>
+
+<p>There’s a little bit more to it than that, simply because I need to check whether it should display the UV checker or the actual material, and I need to stop any ongoing animation loops when the new assets are loaded. But basically we’re just loading new files.</p>
+<p style="text-align: center;">
+  <img src="/3dage_renderer/assets/images/2024-11-26_model_showcase.gif" alt="An animated image showing a range of rendered 3D models" style="max-width: 100%; height: auto;" />
+</p>
+<p><br /></p>
+<h1 id="hosting-the-renderer-online">Hosting the renderer online</h1>
+<p>I wanted the renderer to be available on the internet. After all, what’s the point in having it written in Javascript if it isn’t online? This turned out to be really easy because I took advantage of this blog and Github pages.
+First I had to turn all the renderer code into a <code class="language-plaintext highlighter-rouge">.html</code> and <code class="language-plaintext highlighter-rouge">.js</code> file I could distribute. That was as simple as running <code class="language-plaintext highlighter-rouge">npm run build</code>. Then, I created a new directory in the folder where I store my blog posts called <code class="language-plaintext highlighter-rouge">renderer</code>. The template for Github pages came with some default links to an <code class="language-plaintext highlighter-rouge">About</code> and  <code class="language-plaintext highlighter-rouge">Contact</code> page, but I removed those a few weeks ago. I was able to go back, re-enable the <code class="language-plaintext highlighter-rouge">About</code> page and simply rename it to <code class="language-plaintext highlighter-rouge">renderer</code>. I then pointed it to the <code class="language-plaintext highlighter-rouge">renderer</code> directory I’d created earlier and publish the site. Hey presto, <a href="https://pipding.github.io/3dage_renderer/renderer/">the renderer is on the internet</a>.</p>
+
+<p>To cap it off, I made a <a href="https://github.com/Pipding/3dage_renderer/blob/8cc54f498a5beb0a8f28e1a56ece7bc3649418a2/build_renderer.ps1">build script</a> which will automatically run <code class="language-plaintext highlighter-rouge">npm run build</code> and copy the files into the blog, similar to <a href="https://pipding.github.io/3dage_renderer/2024/10/08/meta-blog-post.html#:~:text=I%20created%20a%20bash%20script">the one I created to build and post my blog site</a>.</p>
+
+
+        <hr>
+
+        <div class="clearfix">
+
+          
+          <a class="btn btn-primary float-left" href="/3dage_renderer/2024/11/19/try_to_add_normal_maps.html" data-toggle="tooltip" data-placement="top" title="An Attempt at Normality">&larr; Previous<span class="d-none d-md-inline">
+              Post</span></a>
+          
+          
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Footer -->
+
+<hr>
+
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto">
+        <ul class="list-inline text-center">
+          
+          
+          
+          
+          
+          
+        </ul>
+        <p class="copyright text-muted">Copyright &copy;  2024</p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/3dage_renderer/assets/vendor/startbootstrap-clean-blog/js/scripts.js"></script>
+
+<script src="/3dage_renderer/assets/scripts.js"></script>
+
+
+
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id="></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', '');
+</script>
+
+
+
+</body>
+
+</html>
