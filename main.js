@@ -30,6 +30,7 @@ let leftKeyDown = false;
 let rightKeyDown = false;
 let upKeyDown = false;
 let downKeyDown = false;
+let mouseDown = false;
 let modelRotationSpeed = new THREE.Vector2;
 let inputLastTime = 0; // Used to calculate deltaTime for user inputs
 
@@ -44,14 +45,21 @@ function updateFrameRate(currentTime) {
     }
 }
 
-function handleModelRotation(currentTime) {
+// This clamp function came from here: https://www.js-craft.io/blog/clamp-numbers-in-javascript/
+const clamp = (val, min, max) => Math.min(Math.max(val, min), max)
+
+function handleUserInput(currentTime) {
 
     const rotationAccelerationFactor = 5;
     const rotationDecayFactor = 3;
 
+    const zoomInAccelerationFactor = 3;
+    const zoomOutAccelerationFactor = 5;
+
     const deltaTime = (currentTime - inputLastTime) / 1000;
     if (!deltaTime) return; // DeltaTime is NaN for first frame or two
 
+    // Handle model rotation first
     if (leftKeyDown) {
         modelRotationSpeed.y += (rotationAccelerationFactor * deltaTime);
     }
@@ -82,6 +90,18 @@ function handleModelRotation(currentTime) {
     }
 
     doRotateWorldSpace(modelRotationSpeed.x, modelRotationSpeed.y, 0);
+
+    // Handle zooming in and out
+    if(mouseDown) {
+        camera.position.z += (zoomInAccelerationFactor * deltaTime);
+    } else {
+        camera.position.z -= (zoomOutAccelerationFactor * deltaTime);
+    }
+    camera.position.z = clamp(camera.position.z, -10, -6)
+
+    camera.position.z.cla
+
+
 
     inputLastTime = currentTime;
 }
@@ -240,7 +260,7 @@ function renderWireframe(currentTime) {
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     updateFrameRate(currentTime);
-    handleModelRotation(currentTime);
+    handleUserInput(currentTime);
 
     if (mesh.rotationNeedsUpdate) {
         rotationMatrix.makeRotationFromEuler(mesh.rotation);
@@ -300,7 +320,7 @@ function renderWithTexture(currentTime) {
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     updateFrameRate(currentTime);
-    handleModelRotation(currentTime);
+    handleUserInput(currentTime);
 
     if (mesh.rotationNeedsUpdate) {
         rotationMatrix.makeRotationFromEuler(mesh.rotation);
@@ -556,4 +576,12 @@ document.addEventListener("keyup", function onEvent(event) {
     else if (event.key === "ArrowUp") {
         upKeyDown = false;
     }
+});
+
+document.addEventListener("mousedown", function onEvent(event) {
+    mouseDown = true;
+});
+
+document.addEventListener("mouseup", function onEvent(event) {
+    mouseDown = false;
 });
