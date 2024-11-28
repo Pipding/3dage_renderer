@@ -114,6 +114,9 @@ function handleUserInput(currentTime) {
         modelRotationSpeed.x += (rotationAccelerationFactor * deltaTime);
     }
 
+    modelRotationSpeed.x = clamp(modelRotationSpeed.x, -10, 10);
+    modelRotationSpeed.y = clamp(modelRotationSpeed.y, -10, 10);
+
     // Decay speed if buttons aren't pressed
     if (!leftKeyDown && !rightKeyDown && Math.abs(modelRotationSpeed.y) > 0) {
         modelRotationSpeed.y -= modelRotationSpeed.y * (rotationDecayFactor * deltaTime);
