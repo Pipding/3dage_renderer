@@ -33,6 +33,7 @@ let downKeyDown = false;
 let mouseDown = false;
 let modelRotationSpeed = new THREE.Vector2;
 let inputLastTime = 0; // Used to calculate deltaTime for user inputs
+let wireframeMode = true;
 
 
 // Keeps track of the number of frames which have passed each second
@@ -99,10 +100,6 @@ function handleUserInput(currentTime) {
     }
     camera.position.z = clamp(camera.position.z, -10, -6)
 
-    camera.position.z.cla
-
-
-
     inputLastTime = currentTime;
 }
 
@@ -122,6 +119,7 @@ function drawInfo() {
 function drawControls() {
     const rotationControlText = `Rotate model: Arrow keys or WASD`;
     const zoomControlText = `Zoom: Mouse click`;
+    const wireframeControlText = `Toggle wireframe: Q`;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Semi-transparent background
     ctx.fillRect(canvas.width - 300, canvas.height - 60, 500, 60); // Background rectangle for the text
 
@@ -129,8 +127,9 @@ function drawControls() {
     ctx.font = '16px Arial';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
-    ctx.fillText(rotationControlText, canvas.width - 30, canvas.height - 60); // Position of the text
-    ctx.fillText(zoomControlText, canvas.width - 30, canvas.height - 30); // Position of the text
+    ctx.fillText(wireframeControlText, canvas.width - 30, canvas.height - 90); // Position of the text
+    ctx.fillText(zoomControlText, canvas.width - 30, canvas.height - 60); // Position of the text
+    ctx.fillText(rotationControlText, canvas.width - 30, canvas.height - 30); // Position of the text
 }
 
 // Loads a diffuse map
@@ -254,6 +253,14 @@ function drawTriangle(ctx, v0, v1, v2) {
     ctx.stroke();
 }
 
+function render(currentTime) {
+    if (wireframeMode) {
+        renderWireframe(currentTime);
+    } else {
+        renderWithTexture(currentTime);
+    }
+}
+
 // Function to render the wireframe
 function renderWireframe(currentTime) {
     if (!loadedObject) return;
@@ -307,7 +314,11 @@ function renderWireframe(currentTime) {
     drawControls();
 
     // Continue the animation loop
-    requestAnimationFrame(renderWireframe);
+    if (wireframeMode) {
+        requestAnimationFrame(renderWireframe);
+    } else {
+        requestAnimationFrame(renderWithTexture);
+    }
 }
 
 /**
@@ -394,7 +405,11 @@ function renderWithTexture(currentTime) {
     drawControls();
 
     // Continue the animation loop
-    requestAnimationFrame(renderWithTexture);
+    if (wireframeMode) {
+        requestAnimationFrame(renderWireframe);
+    } else {
+        requestAnimationFrame(renderWithTexture);
+    }
 }
 
 function rasterizeTriangle(v0, v1, v2, uv0, uv1, uv2, normal0, normal1, normal2) {
@@ -587,6 +602,12 @@ document.addEventListener("keyup", function onEvent(event) {
     }
 });
 
+document.addEventListener("keypress", function onEvent(event) {
+    if (event.key === "q") {
+        wireframeMode = !wireframeMode;
+    }
+});
+
 document.addEventListener("mousedown", function onEvent(event) {
     mouseDown = true;
 });
@@ -596,7 +617,6 @@ document.addEventListener("mouseup", function onEvent(event) {
 });
 
 loadDiffuseMap("models/basketball_d.png")
-// loadImageData("models/uv_checker.jpg")
+// loadDiffuseMap("models/uv_checker.jpg")
 
-loadObj("models/basketball_triangulated.obj", renderWireframe);
-// loadObj("models/basketball_triangulated.obj", renderWithTexture);
+loadObj("models/basketball_triangulated.obj", render);
