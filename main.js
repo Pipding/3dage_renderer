@@ -39,16 +39,44 @@ let modelIndex = 0;
 
 const modelLibrary = {
     basketball: {
+        name: "Basketball",
         obj: "models/basketball.obj",
         diffuse: "models/basketball_d.png"
     },
     ducky: {
+        name: "Ducky",
         obj: "models/ducky.obj",
         diffuse: "models/ducky_d.png"
+    },
+    ufo: {
+        name: "UFO",
+        obj: "models/ufo.obj",
+        diffuse: "models/ufo_d.png"
+    },
+    powerup: {
+        name: "Powerup",
+        obj: "models/powerup.obj",
+        diffuse: "models/powerup_d.png"
+    },
+    health: {
+        name: "Health",
+        obj: "models/health.obj",
+        diffuse: "models/health_d.png"
+    },
+    health: {
+        name: "Missile",
+        obj: "models/missile.obj",
+        diffuse: "models/missile_d.png"
     }
 };
 
-const modelList = [modelLibrary.basketball, modelLibrary.ducky]
+const modelList = [
+    modelLibrary.basketball,
+    modelLibrary.ducky,
+    modelLibrary.ufo,
+    modelLibrary.powerup,
+    modelLibrary.health
+]
 
 
 // Keeps track of the number of frames which have passed each second
@@ -136,7 +164,7 @@ function drawControls() {
     const zoomControlText = `Zoom: Mouse Click`;
     const wireframeControlText = `Toggle wireframe: Q`;
     const uvCheckerControlText = `Toggle UV checker material: E`;
-    const toggleModelControlText = `Change model to ${modelList[(modelIndex + 1) % modelList.length].obj.split('/')[1].split('.')[0]}: Spacebar`;
+    const toggleModelControlText = `Change model to ${modelList[(modelIndex + 1) % modelList.length].name}: Spacebar`;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Semi-transparent background
     ctx.fillRect(canvas.width - 300, canvas.height - 60, 500, 60); // Background rectangle for the text
 
