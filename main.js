@@ -6,6 +6,7 @@ const objLoader = new OBJLoader();
 let loadedObject = null;
 
 let diffuseMap = null;
+let diffuseMapLoading = false;
 let mesh = null;
 let geometry = null;
 let vertices = null;
@@ -192,6 +193,7 @@ function drawModelName() {
 
 // Loads a diffuse map
 function loadDiffuseMap(url) {
+    diffuseMapLoading = true;
     const image = new Image();
     image.src = url;
 
@@ -216,6 +218,8 @@ function loadDiffuseMap(url) {
             width: image.width,
             height: image.height
         });
+
+        diffuseMapLoading = false;
     };
 }
 
@@ -465,13 +469,15 @@ function renderWithTexture(currentTime) {
         );
     }
 
-    renderFrameBuffer(ctx)
+    if (!diffuseMapLoading) {
+        renderFrameBuffer(ctx)
+    }
 
     drawInfo();
     drawControls();
     drawModelName();
 
-    // Stop drawing if the loaded object is null
+    // Stop drawing if the loaded object is null 
     if (!loadedObject) return;
 
     // Continue the animation loop
