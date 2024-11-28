@@ -25,6 +25,14 @@ let lastTime = 0;
 let frameCount = 0;
 let fps = 0;
 
+// Variables for user control
+let leftKeyDown = false;
+let rightKeyDown = false;
+let upKeyDown = false;
+let downKeyDown = false;
+let modelRotationSpeed = new THREE.Vector2;
+
+
 // Keeps track of the number of frames which have passed each second
 function updateFrameRate(currentTime) {
     frameCount++;
@@ -33,6 +41,39 @@ function updateFrameRate(currentTime) {
         frameCount = 0;
         lastTime = currentTime;
     }
+}
+
+function handleModelRotation(currentTime) {
+    if (leftKeyDown) {
+        modelRotationSpeed.y += 0.05;
+    }
+    if (rightKeyDown) {
+        modelRotationSpeed.y -= 0.05;
+    }
+
+    if (upKeyDown) {
+        modelRotationSpeed.x -= 0.05;
+    }
+    if (downKeyDown) {
+        modelRotationSpeed.x += 0.05;
+    }
+
+    // Decay speed if buttons aren't pressed
+    if (!leftKeyDown && !rightKeyDown && Math.abs(modelRotationSpeed.y) > 0) {
+        modelRotationSpeed.y *= 0.9;
+        if (Math.abs(modelRotationSpeed.y) <= 0.05) {
+            modelRotationSpeed.y = 0;
+        }
+    }
+
+    if (!upKeyDown && !downKeyDown && Math.abs(modelRotationSpeed.x) > 0) {
+        modelRotationSpeed.x *= 0.9;
+        if (Math.abs(modelRotationSpeed.x) <= 0.05) {
+            modelRotationSpeed.x = 0;
+        }
+    }
+
+    doRotateWorldSpace(modelRotationSpeed.x, modelRotationSpeed.y, 0);
 }
 
 // Draws framerate and resolution information on teh screen
@@ -189,6 +230,7 @@ function renderWireframe(currentTime) {
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     updateFrameRate(currentTime);
+    handleModelRotation(currentTime);
 
     if (mesh.rotationNeedsUpdate) {
         rotationMatrix.makeRotationFromEuler(mesh.rotation);
@@ -248,6 +290,7 @@ function renderWithTexture(currentTime) {
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     updateFrameRate(currentTime);
+    handleModelRotation(currentTime);
 
     if (mesh.rotationNeedsUpdate) {
         rotationMatrix.makeRotationFromEuler(mesh.rotation);
@@ -477,16 +520,30 @@ loadObj("models/basketball_triangulated.obj", renderWithTexture);
 
 document.addEventListener("keydown", function onEvent(event) {
     if (event.key === "ArrowLeft") {
-        doRotateWorldSpace(0, 1, 0)
+        leftKeyDown = true;
     }
     else if (event.key === "ArrowRight") {
-        
-        doRotateWorldSpace(0, -1, 0)
+        rightKeyDown = true;
     }
     else if (event.key === "ArrowDown") {
-        doRotateWorldSpace(1, 0, 0)
+        downKeyDown = true;
     }
     else if (event.key === "ArrowUp") {
-        doRotateWorldSpace(-1, 0, 0)
+        upKeyDown = true;
+    }
+});
+
+document.addEventListener("keyup", function onEvent(event) {
+    if (event.key === "ArrowLeft") {
+        leftKeyDown = false;
+    }
+    else if (event.key === "ArrowRight") {
+        rightKeyDown = false;
+    }
+    else if (event.key === "ArrowDown") {
+        downKeyDown = false;
+    }
+    else if (event.key === "ArrowUp") {
+        upKeyDown = false;
     }
 });
