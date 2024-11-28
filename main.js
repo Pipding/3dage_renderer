@@ -31,6 +31,7 @@ let rightKeyDown = false;
 let upKeyDown = false;
 let downKeyDown = false;
 let modelRotationSpeed = new THREE.Vector2;
+let inputLastTime = 0; // Used to calculate deltaTime for user inputs
 
 
 // Keeps track of the number of frames which have passed each second
@@ -44,36 +45,45 @@ function updateFrameRate(currentTime) {
 }
 
 function handleModelRotation(currentTime) {
+
+    const rotationAccelerationFactor = 5;
+    const rotationDecayFactor = 3;
+
+    const deltaTime = (currentTime - inputLastTime) / 1000;
+    if (!deltaTime) return; // DeltaTime is NaN for first frame or two
+
     if (leftKeyDown) {
-        modelRotationSpeed.y += 0.05;
+        modelRotationSpeed.y += (rotationAccelerationFactor * deltaTime);
     }
     if (rightKeyDown) {
-        modelRotationSpeed.y -= 0.05;
+        modelRotationSpeed.y -= (rotationAccelerationFactor * deltaTime);
     }
 
     if (upKeyDown) {
-        modelRotationSpeed.x -= 0.05;
+        modelRotationSpeed.x -= (rotationAccelerationFactor * deltaTime);
     }
     if (downKeyDown) {
-        modelRotationSpeed.x += 0.05;
+        modelRotationSpeed.x += (rotationAccelerationFactor * deltaTime);
     }
 
     // Decay speed if buttons aren't pressed
     if (!leftKeyDown && !rightKeyDown && Math.abs(modelRotationSpeed.y) > 0) {
-        modelRotationSpeed.y *= 0.9;
+        modelRotationSpeed.y -= modelRotationSpeed.y * (rotationDecayFactor * deltaTime);
         if (Math.abs(modelRotationSpeed.y) <= 0.05) {
             modelRotationSpeed.y = 0;
         }
     }
 
     if (!upKeyDown && !downKeyDown && Math.abs(modelRotationSpeed.x) > 0) {
-        modelRotationSpeed.x *= 0.9;
+        modelRotationSpeed.x -= modelRotationSpeed.x * (rotationDecayFactor * deltaTime);
         if (Math.abs(modelRotationSpeed.x) <= 0.05) {
             modelRotationSpeed.x = 0;
         }
     }
 
     doRotateWorldSpace(modelRotationSpeed.x, modelRotationSpeed.y, 0);
+
+    inputLastTime = currentTime;
 }
 
 // Draws framerate and resolution information on teh screen
