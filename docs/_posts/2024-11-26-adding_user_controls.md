@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Adding a Semblance of Control"
+title: "A Semblance of Control"
 subtitle: "Making the renderer presentable ahead of presentations, week ending 2024-11-26"
 date: 2024-11-26 18:00:00
 background: '/assets/images/2024-11-26_model_showcase.gif'

@@ -1,7 +1,7 @@
 ---
 layout: page
 title: Blog posts
-background: '/assets/images/missing_texture.png'
+background: '/assets/images/2024-11-26_model_showcase.gif'
 ---
 
 {% for post in site.posts %}
