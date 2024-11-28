@@ -34,7 +34,46 @@ let mouseDown = false;
 let modelRotationSpeed = new THREE.Vector2;
 let inputLastTime = 0; // Used to calculate deltaTime for user inputs
 let wireframeMode = true;
+let uvCheckerMode = false;
+let modelIndex = 0;
 
+// Ref to next animation frame, used to cancel rendering while switching models
+let nextAnimFrame = null;
+
+const modelLibrary = {
+    basketball: {
+        name: "Basketball",
+        obj: "models/basketball.obj",
+        diffuse: "models/basketball_d.png"
+    },
+    ducky: {
+        name: "Ducky",
+        obj: "models/ducky.obj",
+        diffuse: "models/ducky_d.png"
+    },
+    ufo: {
+        name: "UFO",
+        obj: "models/ufo.obj",
+        diffuse: "models/ufo_d.png"
+    },
+    powerup: {
+        name: "Powerup",
+        obj: "models/powerup.obj",
+        diffuse: "models/powerup_d.png"
+    },
+    health: {
+        name: "Health",
+        obj: "models/health.obj",
+        diffuse: "models/health_d.png"
+    },
+    missile: {
+        name: "Missile",
+        obj: "models/missile.obj",
+        diffuse: "models/missile_d.png"
+    }
+};
+
+const modelList = Object.values(modelLibrary);
 
 // Keeps track of the number of frames which have passed each second
 function updateFrameRate(currentTime) {
@@ -118,8 +157,10 @@ function drawInfo() {
 
 function drawControls() {
     const rotationControlText = `Rotate model: Arrow keys or WASD`;
-    const zoomControlText = `Zoom: Mouse click`;
+    const zoomControlText = `Zoom: Mouse Click`;
     const wireframeControlText = `Toggle wireframe: Q`;
+    const uvCheckerControlText = `Toggle UV checker material: E`;
+    const toggleModelControlText = `Change model to ${modelList[(modelIndex + 1) % modelList.length].name}: Spacebar`;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Semi-transparent background
     ctx.fillRect(canvas.width - 300, canvas.height - 60, 500, 60); // Background rectangle for the text
 
@@ -127,9 +168,23 @@ function drawControls() {
     ctx.font = '16px Arial';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
-    ctx.fillText(wireframeControlText, canvas.width - 30, canvas.height - 90); // Position of the text
-    ctx.fillText(zoomControlText, canvas.width - 30, canvas.height - 60); // Position of the text
-    ctx.fillText(rotationControlText, canvas.width - 30, canvas.height - 30); // Position of the text
+    ctx.fillText(wireframeControlText, canvas.width - 30, canvas.height - 150); // Position of the text
+    ctx.fillText(uvCheckerControlText, canvas.width - 30, canvas.height - 120); // Position of the text
+    ctx.fillText(zoomControlText, canvas.width - 30, canvas.height - 90); // Position of the text
+    ctx.fillText(rotationControlText, canvas.width - 30, canvas.height - 60); // Position of the text
+    ctx.fillText(toggleModelControlText, canvas.width - 30, canvas.height - 30); // Position of the text
+}
+
+function drawModelName() {
+    const modelNameText = `${modelList[(modelIndex) % modelList.length].name}`;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Semi-transparent background
+    ctx.fillRect(0, 10, 250, 30); // Background rectangle for the text
+
+    ctx.fillStyle = 'white';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(modelNameText, 10, 10); // Position of the text
 }
 
 // Loads a diffuse map
@@ -164,6 +219,10 @@ function loadDiffuseMap(url) {
 function loadObj(filePath, callback) {
     // Note: THREE.js always lods OBJ files as non-indexed. If you want indexed verts, you
     // need to call BufferGeometryUtils.mergeVertices: https://threejs.org/docs/index.html#examples/en/utils/BufferGeometryUtils.mergeVertices
+
+    cancelAnimationFrame(nextAnimFrame);
+
+    console.log(`Loading ${filePath}`);
 
     // Source for the loading code: https://threejs.org/docs/#examples/en/loaders/OBJLoader
     objLoader.load(filePath,
@@ -312,12 +371,16 @@ function renderWireframe(currentTime) {
 
     drawInfo();
     drawControls();
+    drawModelName();
+
+    // Stop drawing if the loaded object is null
+    if (!loadedObject) return;
 
     // Continue the animation loop
     if (wireframeMode) {
-        requestAnimationFrame(renderWireframe);
+        nextAnimFrame = requestAnimationFrame(renderWireframe);
     } else {
-        requestAnimationFrame(renderWithTexture);
+        nextAnimFrame = requestAnimationFrame(renderWithTexture);
     }
 }
 
@@ -403,12 +466,16 @@ function renderWithTexture(currentTime) {
 
     drawInfo();
     drawControls();
+    drawModelName();
+
+    // Stop drawing if the loaded object is null
+    if (!loadedObject) return;
 
     // Continue the animation loop
     if (wireframeMode) {
-        requestAnimationFrame(renderWireframe);
+        nextAnimFrame = requestAnimationFrame(renderWireframe);
     } else {
-        requestAnimationFrame(renderWithTexture);
+        nextAnimFrame = requestAnimationFrame(renderWithTexture);
     }
 }
 
@@ -605,6 +672,25 @@ document.addEventListener("keyup", function onEvent(event) {
 document.addEventListener("keypress", function onEvent(event) {
     if (event.key === "q") {
         wireframeMode = !wireframeMode;
+    } else if (event.key === "e") {
+        uvCheckerMode = !uvCheckerMode;
+
+        if (uvCheckerMode) {
+            loadDiffuseMap("models/uv_checker.jpg")
+        } else {
+            loadDiffuseMap(modelList[modelIndex].diffuse);
+        }
+    } else if (event.key === "spacebar" || event.key === " ") {
+        modelIndex = (modelIndex + 1) % modelList.length;
+        loadedObject = null;
+        mesh = null;
+
+        if (uvCheckerMode) {
+            loadDiffuseMap("models/uv_checker.jpg")
+        } else {
+            loadDiffuseMap(modelList[modelIndex].diffuse);
+        }
+        loadObj(modelList[modelIndex].obj, render);
     }
 });
 
@@ -616,7 +702,5 @@ document.addEventListener("mouseup", function onEvent(event) {
     mouseDown = false;
 });
 
-loadDiffuseMap("models/basketball_d.png")
-// loadDiffuseMap("models/uv_checker.jpg")
-
-loadObj("models/basketball_triangulated.obj", render);
+loadDiffuseMap(modelList[modelIndex].diffuse);
+loadObj(modelList[modelIndex].obj, render);
