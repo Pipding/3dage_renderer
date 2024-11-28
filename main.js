@@ -105,7 +105,13 @@ function resizeCanvas() {
 
     frameBuffer = new Uint8ClampedArray(canvas.width * canvas.height * 4);
     frameBufferEmpty = new Uint8ClampedArray(canvas.width * canvas.height * 4);
-    frameBufferEmpty.fill(0)
+    // Fill the empty frame buffer with black pixels
+    for (let i = 0; i < frameBufferEmpty.length; i += 4) {
+        frameBufferEmpty[i] = 0;
+        frameBufferEmpty[i + 1] = 0;
+        frameBufferEmpty[i + 2] = 0;
+        frameBufferEmpty[i + 3] = 255;
+    }
 
     depthBuffer = new Float32Array(canvas.width * canvas.height);
     depthBufferEmpty = new Float32Array(canvas.width * canvas.height);
@@ -189,9 +195,9 @@ function renderWireframe(currentTime) {
         mesh.rotationNeedsUpdate = false;
     }
 
-    mesh.rotation.x += 0.05;
-    mesh.rotation.y += 0.02;
-    mesh.rotationNeedsUpdate = true;
+    // mesh.rotation.x += 0.05;
+    // mesh.rotation.y += 0.02;
+    // mesh.rotationNeedsUpdate = true;
 
     // Transform and project all vertices
     const transformedVertices = [];
@@ -253,9 +259,9 @@ function renderWithTexture(currentTime) {
     }
 
     // Rotation just for testing
-    mesh.rotation.x += 0.05;
-    mesh.rotation.y += 0.02;
-    mesh.rotationNeedsUpdate = true;
+    // mesh.rotation.x += 0.05;
+    // mesh.rotation.y += 0.02;
+    // mesh.rotationNeedsUpdate = true;
 
     // Transform and project all vertices
     const transformedVertices = [];
@@ -301,7 +307,6 @@ function renderWithTexture(currentTime) {
             uv0, uv1, uv2, // UVs
             transformedNormals[i/3], transformedNormals[(i/3) + 1], transformedNormals[(i/3) + 2]// Normals
         );
-        // drawTriangle(ctx, projectedVertices[i/3], projectedVertices[(i/3) + 1], projectedVertices[(i/3) + 2]) // Enable this to draw wireframe
     }
 
     renderFrameBuffer(ctx)
@@ -442,5 +447,5 @@ function sampleTexture(textureData, texWidth, texHeight, uv) {
 loadDiffuseMap("models/basketball_d.png")
 // loadImageData("models/uv_checker.jpg")
 
-loadObj("models/basketball_triangulated.obj", renderWireframe);
-// loadObj("models/basketball_triangulated.obj", renderWithTexture);
+// loadObj("models/basketball_triangulated.obj", renderWireframe);
+loadObj("models/basketball_triangulated.obj", renderWithTexture);
