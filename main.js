@@ -35,6 +35,20 @@ let modelRotationSpeed = new THREE.Vector2;
 let inputLastTime = 0; // Used to calculate deltaTime for user inputs
 let wireframeMode = true;
 let uvCheckerMode = false;
+let modelIndex = 0;
+
+const modelLibrary = {
+    basketball: {
+        obj: "models/basketball.obj",
+        diffuse: "models/basketball_d.png"
+    },
+    ducky: {
+        obj: "models/ducky.obj",
+        diffuse: "models/ducky_d.png"
+    }
+};
+
+const modelList = [modelLibrary.basketball, modelLibrary.ducky]
 
 
 // Keeps track of the number of frames which have passed each second
@@ -167,6 +181,8 @@ function loadDiffuseMap(url) {
 function loadObj(filePath, callback) {
     // Note: THREE.js always lods OBJ files as non-indexed. If you want indexed verts, you
     // need to call BufferGeometryUtils.mergeVertices: https://threejs.org/docs/index.html#examples/en/utils/BufferGeometryUtils.mergeVertices
+
+    console.log(`Loading ${filePath}`);
 
     // Source for the loading code: https://threejs.org/docs/#examples/en/loaders/OBJLoader
     objLoader.load(filePath,
@@ -316,6 +332,9 @@ function renderWireframe(currentTime) {
     drawInfo();
     drawControls();
 
+    // Stop drawing if the loaded object is null
+    if (!loadedObject) return;
+
     // Continue the animation loop
     if (wireframeMode) {
         requestAnimationFrame(renderWireframe);
@@ -406,6 +425,9 @@ function renderWithTexture(currentTime) {
 
     drawInfo();
     drawControls();
+
+    // Stop drawing if the loaded object is null
+    if (!loadedObject) return;
 
     // Continue the animation loop
     if (wireframeMode) {
@@ -614,8 +636,15 @@ document.addEventListener("keypress", function onEvent(event) {
         if (uvCheckerMode) {
             loadDiffuseMap("models/uv_checker.jpg")
         } else {
-            loadDiffuseMap("models/basketball_d.png")
+            loadDiffuseMap(modelList[modelIndex].diffuse);
         }
+    } else if (event.key === "spacebar" || event.key === " ") {
+        modelIndex = (modelIndex + 1) % modelList.length;
+        loadedObject = null;
+        mesh = null;
+
+        loadDiffuseMap(modelList[modelIndex].diffuse);
+        loadObj(modelList[modelIndex].obj, render);
     }
 });
 
@@ -627,5 +656,5 @@ document.addEventListener("mouseup", function onEvent(event) {
     mouseDown = false;
 });
 
-loadDiffuseMap("models/basketball_d.png")
-loadObj("models/basketball_triangulated.obj", render);
+loadDiffuseMap(modelList[modelIndex].diffuse);
+loadObj(modelList[modelIndex].obj, render);
