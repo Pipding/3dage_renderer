@@ -37,6 +37,9 @@ let wireframeMode = true;
 let uvCheckerMode = false;
 let modelIndex = 0;
 
+// Ref to next animation frame, used to cancel rendering while switching models
+let nextAnimFrame = null;
+
 const modelLibrary = {
     basketball: {
         name: "Basketball",
@@ -63,21 +66,14 @@ const modelLibrary = {
         obj: "models/health.obj",
         diffuse: "models/health_d.png"
     },
-    health: {
+    missile: {
         name: "Missile",
         obj: "models/missile.obj",
         diffuse: "models/missile_d.png"
     }
 };
 
-const modelList = [
-    modelLibrary.basketball,
-    modelLibrary.ducky,
-    modelLibrary.ufo,
-    modelLibrary.powerup,
-    modelLibrary.health
-]
-
+const modelList = Object.values(modelLibrary);
 
 // Keeps track of the number of frames which have passed each second
 function updateFrameRate(currentTime) {
@@ -179,6 +175,18 @@ function drawControls() {
     ctx.fillText(toggleModelControlText, canvas.width - 30, canvas.height - 30); // Position of the text
 }
 
+function drawModelName() {
+    const modelNameText = `${modelList[(modelIndex) % modelList.length].name}`;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Semi-transparent background
+    ctx.fillRect(0, 10, 250, 30); // Background rectangle for the text
+
+    ctx.fillStyle = 'white';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(modelNameText, 10, 10); // Position of the text
+}
+
 // Loads a diffuse map
 function loadDiffuseMap(url) {
     const image = new Image();
@@ -211,6 +219,8 @@ function loadDiffuseMap(url) {
 function loadObj(filePath, callback) {
     // Note: THREE.js always lods OBJ files as non-indexed. If you want indexed verts, you
     // need to call BufferGeometryUtils.mergeVertices: https://threejs.org/docs/index.html#examples/en/utils/BufferGeometryUtils.mergeVertices
+
+    cancelAnimationFrame(nextAnimFrame);
 
     console.log(`Loading ${filePath}`);
 
@@ -361,15 +371,16 @@ function renderWireframe(currentTime) {
 
     drawInfo();
     drawControls();
+    drawModelName();
 
     // Stop drawing if the loaded object is null
     if (!loadedObject) return;
 
     // Continue the animation loop
     if (wireframeMode) {
-        requestAnimationFrame(renderWireframe);
+        nextAnimFrame = requestAnimationFrame(renderWireframe);
     } else {
-        requestAnimationFrame(renderWithTexture);
+        nextAnimFrame = requestAnimationFrame(renderWithTexture);
     }
 }
 
@@ -455,15 +466,16 @@ function renderWithTexture(currentTime) {
 
     drawInfo();
     drawControls();
+    drawModelName();
 
     // Stop drawing if the loaded object is null
     if (!loadedObject) return;
 
     // Continue the animation loop
     if (wireframeMode) {
-        requestAnimationFrame(renderWireframe);
+        nextAnimFrame = requestAnimationFrame(renderWireframe);
     } else {
-        requestAnimationFrame(renderWithTexture);
+        nextAnimFrame = requestAnimationFrame(renderWithTexture);
     }
 }
 
