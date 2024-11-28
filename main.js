@@ -195,10 +195,6 @@ function renderWireframe(currentTime) {
         mesh.rotationNeedsUpdate = false;
     }
 
-    // mesh.rotation.x += 0.05;
-    // mesh.rotation.y += 0.02;
-    // mesh.rotationNeedsUpdate = true;
-
     // Transform and project all vertices
     const transformedVertices = [];
     const transformedNormals = [];
@@ -257,11 +253,6 @@ function renderWithTexture(currentTime) {
         rotationMatrix.makeRotationFromEuler(mesh.rotation);
         mesh.rotationNeedsUpdate = false;
     }
-
-    // Rotation just for testing
-    // mesh.rotation.x += 0.05;
-    // mesh.rotation.y += 0.02;
-    // mesh.rotationNeedsUpdate = true;
 
     // Transform and project all vertices
     const transformedVertices = [];
@@ -444,8 +435,58 @@ function sampleTexture(textureData, texWidth, texHeight, uv) {
     return { r, g, b, a };
 }
 
+// The following rotation code is based on the fiddle here:
+// https://jsfiddle.net/2whv0e8o/13/
+// Which in turn came from StackOverflow:
+// https://stackoverflow.com/questions/37903979/set-an-objects-absolute-rotation-around-the-world-axis
+function toRadians(angle) {
+    return angle * (Math.PI / 180);
+};
+
+function doRotateWorldSpace(rotateX, rotateY, rotateZ) {
+    const x = toRadians(rotateX);
+    const y = toRadians(rotateY);
+    const z = toRadians(rotateZ);
+
+    // Create quaternions for world-space rotations. The vectors given here represent
+    // the world-space axes and the angles are the angles by which we want to rotate
+    const quaternionX = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), x);
+    const quaternionY = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), y);
+    const quaternionZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), z);
+
+    // Combine the rotations
+    const worldQuaternion = new THREE.Quaternion()
+        .multiply(quaternionX)
+        .multiply(quaternionY)
+        .multiply(quaternionZ);
+
+    // Apply the quaternion rotation to the mesh in world space and update the world matrix
+    mesh.applyQuaternion(worldQuaternion);
+    mesh.updateMatrixWorld(true);
+
+    // Mark rotation as dirty so it gets updated next frame
+    mesh.rotationNeedsUpdate = true;
+}
+
+
 loadDiffuseMap("models/basketball_d.png")
 // loadImageData("models/uv_checker.jpg")
 
 // loadObj("models/basketball_triangulated.obj", renderWireframe);
 loadObj("models/basketball_triangulated.obj", renderWithTexture);
+
+document.addEventListener("keydown", function onEvent(event) {
+    if (event.key === "ArrowLeft") {
+        doRotateWorldSpace(0, 1, 0)
+    }
+    else if (event.key === "ArrowRight") {
+        
+        doRotateWorldSpace(0, -1, 0)
+    }
+    else if (event.key === "ArrowDown") {
+        doRotateWorldSpace(1, 0, 0)
+    }
+    else if (event.key === "ArrowUp") {
+        doRotateWorldSpace(-1, 0, 0)
+    }
+});
