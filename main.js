@@ -136,6 +136,7 @@ function drawControls() {
     const zoomControlText = `Zoom: Mouse Click`;
     const wireframeControlText = `Toggle wireframe: Q`;
     const uvCheckerControlText = `Toggle UV checker material: E`;
+    const toggleModelControlText = `Change model to ${modelList[(modelIndex + 1) % modelList.length].obj.split('/')[1].split('.')[0]}: Spacebar`;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Semi-transparent background
     ctx.fillRect(canvas.width - 300, canvas.height - 60, 500, 60); // Background rectangle for the text
 
@@ -143,10 +144,11 @@ function drawControls() {
     ctx.font = '16px Arial';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
-    ctx.fillText(wireframeControlText, canvas.width - 30, canvas.height - 120); // Position of the text
-    ctx.fillText(uvCheckerControlText, canvas.width - 30, canvas.height - 90); // Position of the text
-    ctx.fillText(zoomControlText, canvas.width - 30, canvas.height - 60); // Position of the text
-    ctx.fillText(rotationControlText, canvas.width - 30, canvas.height - 30); // Position of the text
+    ctx.fillText(wireframeControlText, canvas.width - 30, canvas.height - 150); // Position of the text
+    ctx.fillText(uvCheckerControlText, canvas.width - 30, canvas.height - 120); // Position of the text
+    ctx.fillText(zoomControlText, canvas.width - 30, canvas.height - 90); // Position of the text
+    ctx.fillText(rotationControlText, canvas.width - 30, canvas.height - 60); // Position of the text
+    ctx.fillText(toggleModelControlText, canvas.width - 30, canvas.height - 30); // Position of the text
 }
 
 // Loads a diffuse map
@@ -643,7 +645,11 @@ document.addEventListener("keypress", function onEvent(event) {
         loadedObject = null;
         mesh = null;
 
-        loadDiffuseMap(modelList[modelIndex].diffuse);
+        if (uvCheckerMode) {
+            loadDiffuseMap("models/uv_checker.jpg")
+        } else {
+            loadDiffuseMap(modelList[modelIndex].diffuse);
+        }
         loadObj(modelList[modelIndex].obj, render);
     }
 });
