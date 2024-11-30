@@ -31,6 +31,7 @@ let leftKeyDown = false;
 let rightKeyDown = false;
 let upKeyDown = false;
 let downKeyDown = false;
+let spaceKeyDown = false;
 let mouseDown = false;
 let modelRotationSpeed = new THREE.Vector2;
 let inputLastTime = 0; // Used to calculate deltaTime for user inputs
@@ -660,6 +661,19 @@ document.addEventListener("keydown", function onEvent(event) {
     }
     else if (event.key === "ArrowUp" || event.key == "w") {
         upKeyDown = true;
+    } else if ((event.key === "spacebar" || event.key == " ") && !spaceKeyDown) {
+        spaceKeyDown = true;
+
+        modelIndex = (modelIndex + 1) % modelList.length;
+        loadedObject = null;
+        mesh = null;
+
+        if (uvCheckerMode) {
+            loadDiffuseMap("models/uv_checker.jpg")
+        } else {
+            loadDiffuseMap(modelList[modelIndex].diffuse);
+        }
+        loadObj(modelList[modelIndex].obj, render);
     }
 });
 
@@ -675,6 +689,8 @@ document.addEventListener("keyup", function onEvent(event) {
     }
     else if (event.key === "ArrowUp" || event.key == "w") {
         upKeyDown = false;
+    } else if (event.key === "spacebar" || event.key == " ") {
+        spaceKeyDown = false;
     }
 });
 
@@ -689,17 +705,6 @@ document.addEventListener("keypress", function onEvent(event) {
         } else {
             loadDiffuseMap(modelList[modelIndex].diffuse);
         }
-    } else if (event.key === "spacebar" || event.key === " ") {
-        modelIndex = (modelIndex + 1) % modelList.length;
-        loadedObject = null;
-        mesh = null;
-
-        if (uvCheckerMode) {
-            loadDiffuseMap("models/uv_checker.jpg")
-        } else {
-            loadDiffuseMap(modelList[modelIndex].diffuse);
-        }
-        loadObj(modelList[modelIndex].obj, render);
     }
 });
 
