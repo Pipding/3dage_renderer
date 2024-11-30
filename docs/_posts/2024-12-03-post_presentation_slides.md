@@ -2,7 +2,7 @@
 layout: post
 title: "Symposium"
 subtitle: "Posting presentation slides ahead of the symposium, week ending 2024-12-03"
-date: 2024-12-03 18:00:00
+date: 2024-11-30 18:00:00
 background: '/assets/images/2024-11-26_model_showcase.gif'
 author: "Ryan"
 ---
